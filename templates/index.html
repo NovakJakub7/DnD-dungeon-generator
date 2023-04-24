@@ -11,9 +11,9 @@
     <!-- TODO:  další možnosti formuláře
                 navigace?, footer?, další sekce? -->
     <main>
-        <div class="container-fluid ">
+        <div class="container-fluid vh-100">
             <div class="row vh-100 align-items-center">
-                <form class="col" method="POST" action="/generate">
+                <form class="col-4" method="POST" action="/generate">
                     <div class="mb-3">
                         <label for="algoType" class="form-label">Typ použitého algoritmu</label>
                         <select class="form-select" name="algoType"  aria-label="Default select example">
@@ -28,7 +28,9 @@
                 </form>
             
                 {% if option %}
-                    <img src="../static/svg/map.svg" alt="Dungeon map">
+                <div class="col-8">
+                    <img src="../static/svg/map.svg" class="img-fluid" alt="Dungeon map">
+                </div>    
                 {% endif %}
                
             </div>

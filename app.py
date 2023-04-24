@@ -9,9 +9,9 @@ def generate_map(options):
     # TODO: 
     #   z options ziskam jedlotive parametry
 
-    map = ca.generate_map(50, 50, floor_probability=.5, number_of_iterations=4, rock_threshold=5)
+    map = ca.generate_map(50, 50, 123, floor_probability=.5, number_of_iterations=4, rock_threshold=5)
+    ca.process_map(map)
     ca.make_svg_from_map(map)
-
 
 
 @app.route("/generate", methods=['GET', 'POST'])
@@ -23,9 +23,11 @@ def generate():
     
     return render_template("index.html", option = option)
 
+
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)
