@@ -11,32 +11,56 @@
     <!-- TODO:  další možnosti formuláře
                 navigace?, footer?, další sekce? -->
     <main>
-        <div class="container-fluid vh-100">
-            <div class="row vh-100 align-items-center">
+        <div class="container-fluid d-flex vh-100 justify-content-center align-items-center">
                 <form class="col-4" method="POST" action="/generate">
+                    <div>
+                        <label for="seed" class="form-label">Dungeon Seed</label>
+                        <input type="text" class="form-control" name="seed" id="seed" value="">
+                    </div>
                     <div class="mb-3">
-                        <label for="algoType" class="form-label">Typ použitého algoritmu</label>
+                        <label for="algoType" class="form-label">Type Of Dungeon</label>
                         <select class="form-select" name="algoType"  aria-label="Default select example">
-                            <option selected>Vyberte možnost</option>
-                            <option value="1">Cellular Automata</option>
-                            <option value="2">Two</option>
-                            <option value="3">Three</option>
+                            <option selected value="ca">Natural Cavern Complex</option>
+                            <option value="bsp">Ruined/Occupied Structure</option>
                           </select>
                       </div>
+                      <div class="mb-3">
+                        <label for="size" class="form-label">Dungeon Size</label>
+                        <select class="form-select" name="size" aria-label="Default select example">
+                            <option selected value="40">Small</option>
+                            <option value="60">Medium</option>
+                            <option value="80">Large</option>
+                            <option value="100">Huge</option>
+                          </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="motif" class="form-label">Dungeon Motif</label>
+                        <select class="form-select" name="motif" aria-label="Default select example">
+                            <option selected value="random">Random</option>
+                          </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="numberOfPlayers" class="form-label">Number of Players (1-6)</label>
+                        <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="1" min="1" max="6">
+                      </div>
+                      <div class="mb-3">
+                        <label for="averagePlayerLevel" class="form-label">Average player level (1-20)</label>
+                        <input type="number" class="form-control" id="averagePlayerLevel" name="averagePlayerLevel" placeholder="1" min="1" max="20">
+                      </div>
                       
-                      <button type="submit" class="btn btn-primary">Vygenerovat</button>
+                      <button type="submit" class="btn btn-primary">Generate dungeon</button>
                 </form>
-            
-                {% if option %}
-                <div class="col-8">
-                    <img src="../static/svg/map.svg" class="img-fluid" alt="Dungeon map">
-                </div>    
-                {% endif %}
-               
-            </div>
         </div>
     </main>
     <footer></footer>
     <script src="../static/js/bootstrap.js"></script>
+    <script>
+        function randomNumber(){
+            return Math.floor((Math.random() * 10000));
+        }
+        window.onload = function(){
+            document.getElementById("seed").value = randomNumber()
+        };
+    </script>
 </body>
 </html>

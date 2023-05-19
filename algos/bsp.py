@@ -1,10 +1,13 @@
 import random
 import svgwrite
 import os
+from svgwrite import pattern
 
 DISCARD_BY_RATIO = True
 H_RATIO = 0.45
 W_RATIO = 0.45
+
+random.seed(123)
 
 # TODO:
 #   vytvoření chodeb mezi mistnostmi
@@ -96,31 +99,31 @@ class BSPNode:
                     self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif), corridor_size))
                     self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif)))
                 else:
-                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif), corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
                     self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif)))
             elif vertical_dif > 0: # room_1 is above room_2
                 if random.choice([True, False]):
                     self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif), corridor_size))
                     self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif)))
                 else:
-                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif), corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
                     self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif)))
             else: # same vertical
                 self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif), corridor_size))
         elif horizontal_dif > 0:   # room_2 is on the right of room_1
-            if vertical_dif < 0: 
+            if vertical_dif < 0:   # room_2 is above room_1
                 if random.choice([True, False]):
                     self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif), corridor_size))
                     self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif)))
                 else:
-                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif), corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif) + corridor_size, corridor_size))
                     self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif)))
-            elif vertical_dif > 0:
+            elif vertical_dif > 0:  # room_1 is above room_2
                 if random.choice([True, False]):
                     self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif), corridor_size))
                     self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif)))
                 else:
-                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif), corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
                     self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif)))
             else:
                 self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif), corridor_size))
@@ -133,8 +136,12 @@ class BSPNode:
 
     def draw_rooms(self, svg_document):
         for node in self.get_leaf_nodes():
-            room = svg_document.add(svg_document.rect((node.room.left, node.room.top), (node.room.width, node.room.height)))
-            room.fill('white')
+            pattern = svg_document.defs.add(
+                svg_document.pattern(size=(20, 20), patternUnits="userSpaceOnUse"))
+            pattern.add(svg_document.rect((0, 0), (20, 20), fill="white", stroke="black"))
+
+            room = svg_document.add(svg_document.rect((node.room.left, node.room.top), (node.room.width, node.room.height), fill=pattern.get_paint_server()))
+            #room.fill('white')
 
 
     def create_corridors(self, corridor_size):
@@ -154,8 +161,10 @@ class BSPNode:
         if self.corridors:
             for corridor in self.corridors:
                 print(corridor)
-                map_corridor = svg_document.add(svg_document.rect((corridor.left, corridor.top), (corridor.width, corridor.height)))   
-                map_corridor.fill('white')
+                group = svg_document.add(svg_document.g())
+                map_corridor = group.add(svg_document.rect((corridor.left, corridor.top), (corridor.width, corridor.height), fill='white'))   
+                #corridor_id = group.add(svg_document.text(id(self), insert=(corridor.left + 2, corridor.top - 2)))
+                #corridor_id.fill('white')
 
         self.left_child.draw_corridors(svg_document)
         self.right_child.draw_corridors(svg_document)
@@ -228,26 +237,31 @@ class BSPTree:
     def make_svg(self):
         save_path = './static/svg/'
 
-        file_name = "bsp_map.svg"
+        file_name = "map_bsp.svg"
 
         # Combine the path and filename to create the full file path
         file_path = os.path.join(save_path, file_name)
 
+        canvas_width = '{}px'.format(self.root.bounds.width)
+        canvas_height = '{}px'.format(self.root.bounds.height)
+
         # Create a Drawing object and specify the file path
-        dwg = svgwrite.Drawing(file_path)
+        dwg = svgwrite.Drawing(file_path, profile='full', size=(canvas_width, canvas_height))
 
         map = dwg.add(dwg.rect((self.root.bounds.left, self.root.bounds.top), (self.root.bounds.width, self.root.bounds.height)))
         map.fill('black')
         map.stroke('black', width=2)
 
-        self.root.draw_rooms(dwg)
         self.root.draw_corridors(dwg)
+        self.root.draw_rooms(dwg)
+        
         dwg.save()
 
-bsp = BSPTree(Rectangle(0, 0, 800, 800))
-bsp.create_map(200, 200)
-bsp.make_svg()
+if __name__ == "__main__":
+    bsp = BSPTree(Rectangle(0, 0, 800, 800))
+    bsp.create_map(200, 200)
+    bsp.make_svg()
 
-#for node in bsp.get_leaf_nodes():
-#    print(node.room)
+    #for node in bsp.get_leaf_nodes():
+    #    print(node.room)
 
