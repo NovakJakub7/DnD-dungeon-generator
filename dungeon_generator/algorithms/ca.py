@@ -3,7 +3,6 @@ import svgwrite
 import queue
 import os
 import math
-import typing
 from scipy.spatial import KDTree
 from numbers import Number
 
@@ -14,8 +13,6 @@ N: int = 5   # pocet iteraci CA
 T: int = 5   # počet kamene kolem, aby byl prvek taky kamen
 
 # TODO:
-#   dokončit generování chodeb mezi místnostmi
-#   začátek/vstup do dungeonu
 #   vkládání nepřátel, kořisti
 
 
@@ -50,16 +47,14 @@ class CACave:
         return self._map
 
 
-    def make_svg_from_map(self) -> None:
+    def make_svg_from_map(self, cell_size, save_path, file_name) -> None:
         """ Makes svg image from map and saves it to path.
         """
         # Define the size of each cell in the map
-        CELL_SIZE = 10
+        CELL_SIZE = cell_size
 
-        save_path = './static/svg/'
-
-        #file_name = "map_{}.svg".format(self._num)
-        file_name = "map_oop.svg"
+        #save_path = '../static/svg/'
+        #file_name = "map_ca.svg"
 
         # Combine the path and filename to create the full file path
         file_path = os.path.join(save_path, file_name)

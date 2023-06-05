@@ -10,8 +10,6 @@ W_RATIO = 0.45
 random.seed(123)
 
 # TODO:
-#   vytvoření chodeb mezi mistnostmi
-#   začátek/vstup do dungeonu, další podlaží?
 #   vkládání nepřátel, kořisti
 
 class BSPNode:
@@ -234,10 +232,10 @@ class BSPTree:
         return nodes
         
 
-    def make_svg(self):
-        save_path = './static/svg/'
+    def make_svg(self, save_path, file_name):
+        #save_path = './static/svg/'
 
-        file_name = "map_bsp.svg"
+        #file_name = "map_bsp.svg"
 
         # Combine the path and filename to create the full file path
         file_path = os.path.join(save_path, file_name)

@@ -10,12 +10,13 @@
 <body>
     <main>
         <div class="container-fluid d-flex flex-column vh-100 justify-content-center align-items-center">
-            {% if algoType == "ca" %}
-            <img src="../static/svg/map_oop.svg" class="" alt="Dungeon map">
-            {% elif algoType == "bsp" %}
-            <img src="../static/svg/map_bsp.svg" class="" alt="Dungeon map">
-            {% endif %}
-            <a class="btn btn-primary mt-3" href="/" role="button">Back to settings</a>
+            <svg src></svg>
+            <img src="../static/svg/map_{{ algoType }}.svg" class="img-fluid" alt="Dungeon map">
+            <div class="d-flex flex-row mt-3">
+                <a class="btn btn-primary me-3" href="../static/svg/map_{{ algoType }}.svg" download="" role="button">Download</a>
+                <a class="btn btn-primary" href="/" role="button">Back to settings</a>
+            </div>
+
         </div>      
         
     </main>
