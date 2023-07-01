@@ -1,59 +1,121 @@
-<!DOCTYPE html>
-<html lang="cz">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/css/bootstrap.css">
-    <title>Dungeon generator</title>
-</head>
-<body>
-    <!-- TODO:  další možnosti formuláře
-                navigace?, footer?, další sekce? -->
-    <main>
-        <div class="container-fluid d-flex vh-100 justify-content-center align-items-center">
-                <form class="col-4" method="POST" action="/generate">
-                    <div>
-                        <label for="seed" class="form-label">Dungeon Seed</label>
-                        <input type="text" class="form-control" name="seed" id="seed" value="">
+{% extends "base.html" %}
+{% block title %}Dungeon generator{% endblock title %}
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+    <main class="container-fluid d-flex vh-100 justify-content-center align-items-center">
+        <form class="col-4" method="POST" action="/generate">
+            <div>
+                <label for="seed" class="form-label">Dungeon Seed</label>
+                <input type="text" class="form-control" name="seed" id="seed" value="">
+            </div>
+            <div class="mb-3">
+                <label for="algoType" class="form-label">Type Of Dungeon</label>
+                <select class="form-select" name="algoType" id="selectedAlgo" aria-label="Default select example">
+                    <option selected value="ca">Natural Cavern Complex</option>
+                    <option value="bsp">Ruined/Occupied Structure</option>
+                </select>
+            </div>
+            <div id="dungeonSize" class="mb-3">
+                <label for="size" class="form-label">Dungeon Size</label>
+                <select class="form-select" name="size" aria-label="Default select example">
+                    <option selected value="40">Small</option>
+                    <option value="60">Medium</option>
+                    <option value="80">Large</option>
+                    <option value="100">Huge</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="motif" class="form-label">Dungeon Motif</label>
+                <select class="form-select" name="motif" aria-label="Default select example">
+                    <option selected value="Random">Random</option>
+                    <option value="Abandoned">Abandoned</option>
+                    <option value="Vermin">Vermin</option>
+                    <option value="Underdark">Underdark</option>
+                </select>
+            </div>
+            <div class="d-flex flex-row justify-content-between mb-3">
+                <div class="me-3 flex-fill">
+                    <label for="numberOfPlayers" class="form-label">Number of Players (1-6)</label>
+                    <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="2" min="1" max="6">
+                </div>
+                <div class="flex-fill">
+                    <label for="averagePlayerLevel" class="form-label">Average player level (1-20)</label>
+                    <input type="number" class="form-control" id="averagePlayerLevel" name="averagePlayerLevel" placeholder="1" min="1" max="20" required>
+                </div>
+            </div> 
+            <div id="advancedOptions">
+                <div id="optioncaAlgo" class="d-flex flex-column mb-3">
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill me-3">
+                            <label for="caRows" class="form-label">Number of Rows</label>
+                            <input type="number" class="form-control" name="caRows" placeholder="50" min="30" max="200">
+                        </div>
+                        <div class="flex-fill">
+                            <label for="caCols" class="form-label">Number of Columns</label>
+                            <input type="number" class="form-control" name="caCols" placeholder="50" min="30" max="200">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="algoType" class="form-label">Type Of Dungeon</label>
-                        <select class="form-select" name="algoType"  aria-label="Default select example">
-                            <option selected value="ca">Natural Cavern Complex</option>
-                            <option value="bsp">Ruined/Occupied Structure</option>
-                          </select>
-                      </div>
-                      <div class="mb-3">
-                        <label for="size" class="form-label">Dungeon Size</label>
-                        <select class="form-select" name="size" aria-label="Default select example">
-                            <option selected value="40">Small</option>
-                            <option value="60">Medium</option>
-                            <option value="80">Large</option>
-                            <option value="100">Huge</option>
-                          </select>
-                      </div>
-                      <div class="mb-3">
-                        <label for="motif" class="form-label">Dungeon Motif</label>
-                        <select class="form-select" name="motif" aria-label="Default select example">
-                            <option selected value="random">Random</option>
-                          </select>
-                      </div>
-                      <div class="mb-3">
-                        <label for="numberOfPlayers" class="form-label">Number of Players (1-6)</label>
-                        <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="1" min="1" max="6">
-                      </div>
-                      <div class="mb-3">
-                        <label for="averagePlayerLevel" class="form-label">Average player level (1-20)</label>
-                        <input type="number" class="form-control" id="averagePlayerLevel" name="averagePlayerLevel" placeholder="1" min="1" max="20">
-                      </div>
-                      
-                      <button type="submit" class="btn btn-primary">Generate dungeon</button>
-                </form>
-        </div>
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill me-3">
+                            <label for="floorProbability" class="form-label">Floor Probability in T = 0 </label>
+                            <input type="number" class="form-control" name="floorProbability" placeholder="0.5" min="0.1" max="0.9" step="any">
+                        </div>
+                        <div class="flex-fill">
+                            <label for="rockThreshold" class="form-label">Rock Threshold</label>
+                            <input type="number" class="form-control" name="rockThreshold" placeholder="5" min="1" max="8">
+                            
+                        </div>
+                    </div>
+                    <div>
+                        <label for="numberOfIterations" class="form-label">Number of Cellular Automata Iterations</label>
+                        <input type="number" class="form-control" name="numberOfIterations" placeholder="2" min="2">
+                    </div>
+                </div>
+                <div id="optionbspAlgo" class="d-flex flex-column mb-3">
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill me-3">
+                            <label for="bspWidth" class="form-label">Dungeon width</label>
+                            <input type="number" class="form-control" name="bspWidth" placeholder="500" min="500" max="2000">
+                        </div>
+                        <div class="flex-fill">
+                            <label for="bspHeight" class="form-label">Dungeon height</label>
+                            <input type="number" class="form-control" name="bspHeight" placeholder="500" min="500" max="2000">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill me-3">
+                            <label for="bspMinPartitionWidth" class="form-label">Minimal partition width</label>
+                            <input type="number" class="form-control" name="bspMinPartitionWidth" placeholder="500" min="500" max="2000">
+                        </div>
+                        <div class="flex-fill">
+                            <label for="bspMinPartitionHeight" class="form-label">Minimal partition height</label>
+                            <input type="number" class="form-control" name="bspMinPartitionHeight" placeholder="500" min="500" max="2000">
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-row mb-3">
+                    <div class="flex-fill me-3">
+                        <label for="maxTreasureValue" class="form-label">Maximal Treasure Value (gp)</label>
+                        <input type="number" class="form-control" id="maxTreasureValue" name="maxTreasureValue" placeholder="100" min="10">
+                    </div>
+                    <div class="flex-fill">
+                        <label for="cellSize" class="form-label">Cell Size</label>
+                        <input type="number" class="form-control" id="cellSize" name="cellSize" placeholder="10" min="10" max="50">
+                    </div>
+                </div>
+            </div>
+            
+            <input type="hidden" id="toggledAdvanced" name="toggledAdvanced" value="False">
+            <button type="submit" class="btn btn-primary">Generate dungeon</button>
+            <button type="button" class="btn btn-secondary showAdvanced">More options</button>
+                
+        </form>
     </main>
-    <footer></footer>
-    <script src="../static/js/bootstrap.js"></script>
+   {% endblock content %}
+   {% block scripts %}
     <script>
         function randomNumber(){
             return Math.floor((Math.random() * 10000));
@@ -61,6 +123,35 @@
         window.onload = function(){
             document.getElementById("seed").value = randomNumber()
         };
+
+        $(document).ready(function () {
+            $('#advancedOptions').hide();
+            $('.showAdvanced').click(function() {
+                if ($('#advancedOptions').is(':hidden')) {
+                    $('#advancedOptions').slideDown();
+                    $('.showAdvanced').html("Less Options")
+                    $('#dungeonSize').hide()
+                    $('#toggledAdvanced').val("True")
+                } else {
+                    $('#advancedOptions').slideUp();
+                    $('.showAdvanced').html("More Options")
+                    $('#dungeonSize').show()
+                    $('#toggledAdvanced').val("False")
+                }
+            });
+
+            $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
+            $('#optioncaAlgo').show();
+
+            $('#selectedAlgo').change(function() {
+                var selectedAlgo = $(this).val();
+                console.log(selectedAlgo)
+                // Hide all option input divs
+                $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
+
+                // Show the corresponding option input div based on the selected value
+                $('#option' + selectedAlgo + 'Algo').show();
+            });
+        });
     </script>
-</body>
-</html>
+{% endblock scripts %}

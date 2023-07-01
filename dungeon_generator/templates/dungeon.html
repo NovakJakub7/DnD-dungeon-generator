@@ -1,25 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/css/bootstrap.css">
-    <title>Dungeon</title>
-</head>
-<body>
-    <main>
-        <div class="container-fluid d-flex flex-column vh-100 justify-content-center align-items-center">
-            <svg src></svg>
-            <img src="../static/svg/map_{{ algoType }}.svg" class="img-fluid" alt="Dungeon map">
-            <div class="d-flex flex-row mt-3">
-                <a class="btn btn-primary me-3" href="../static/svg/map_{{ algoType }}.svg" download="" role="button">Download</a>
-                <a class="btn btn-primary" href="/" role="button">Back to settings</a>
-            </div>
+{% extends "base.html" %}
+{% block title %}Generated Dungeon{% endblock title %}
+{% block head %}
+    {{ super() }}
+{% endblock head %}
 
-        </div>      
+{% block content %}
+    <main class="container-fluid d-flex flex-column justify-content-center align-items-center">
+        <ul class="list-group list-group-flush">
+            {% for level in map_description %}
+            <li class="list-group-item">
+                <h3>Level {{level['level_id'] + 1}}</h3>
+                <img src="../static/svg/{{level['svg_name']}}" class="img-fluid" alt="Dungeon map - {{level['level_id']}}">
+                <div class="d-flex flex-row justify-content-center mt-3">
+                    <svg width="20" height="20">
+                        <rect width="20" height="20" style="fill: red;">
+                    </svg>
+                </div>
+                <div class="d-flex flex-row justify-content-center mt-3">
+                    <a class="btn btn-primary" href="../static/svg/{{level['svg_name']}}" download="" role="button">Download</a>   
+                </div>
+
+                <table class="table">
+                        {% for cave in level['desc_list'] %}
+                        <tr>
+                            <th scope="row">Cave: {{cave['cave_id'] + 1}}</th>
+                            <td>
+                                <table class="table">
+                                    
+                                    {% if cave['monster_desc']|length > 0 %}
+                                    <tr>
+                                        <th scope="row">Monsters:</th>
+                                        <td>{{cave['monster_desc']['number_of_monsters']}}× {{cave['monster_desc']['monster']['monster_name']}}, {{cave['monster_desc']['monster']['size']}}, {{cave['monster_desc']['monster']['monster_type']}}, CR: {{cave['monster_desc']['monster']['challenge_rating']}}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if cave['treasure']|length > 0 %}
+                                    <tr>
+                                        <th scope="row">Treasure:</th>
+                                        {% if cave['treasure']['item'] is not none%}
+                                            <td>{{cave['treasure']['item']['item_name']}}, {{cave['treasure']['item']['item_type']}}, {{cave['treasure']['item']['weight']}}, {{cave['treasure']['item']['price']}} gp</td>
+                                        {% endif %}
+                                        {% if cave['treasure']['gp'] > 0 %}
+                                            <td>{{cave['treasure']['gp']}} gp</td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endif %}
+                                    {% if not cave['monster_desc']|length > 0 and not cave['treasure']|length > 0 %}
+                                        {% if 'ca' in level['svg_name']%}
+                                        <tr>
+                                            <td>The cave seems to be empty.</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td>The room looks empty.</td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endif %}
+                                </table>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                </table>   
+
+            </li>
+            {% endfor %}
+            <li class="list-group-item"><a class="btn btn-primary" href="/" role="button">Back to settings</a></li>
+        </ul>   
+        
         
     </main>
-    <script src="../static/js/bootstrap.js"></script>
-</body>
-</html>
+{% endblock content %}
