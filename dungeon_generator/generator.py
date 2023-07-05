@@ -27,32 +27,38 @@ def generate_map(selected_options, db_conn):
             number_of_iterations = int(selected_options["numberOfIterations"])
             rock_threshold = int(selected_options["rockThreshold"])
             max_treasure_value = int(selected_options["maxTreasureValue"])
+            number_of_levels = int(selected_options["numberOfLevels"])
         else:
             size = int(selected_options["size"])
             rows = size
             cols = size 
-            cell_size = 10
+            cell_size = 15
             floor_probability = ca.F
             number_of_iterations = ca.N
             rock_threshold = ca.T
+            number_of_levels = 1
         
-        d = ca.CADungeon(save_path, cell_size, motif, average_player_level, number_of_players, max_treasure_value, db_conn, 1)
+        d = ca.CADungeon(save_path, cell_size, motif, average_player_level, number_of_players, max_treasure_value, db_conn, number_of_levels)
         dungeon_description = d.generate_dungeon(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold)
     else:
         if selected_options["toggledAdvanced"] == "True":
-            width = int(selected_options["bspWidth"])
-            height = int(selected_options["bspHeight"])
-            min_partition_width = int(selected_options["bspMinPartitionWidth"])
-            min_partition_height = int(selected_options["bspMinPartitionHeight"])
+            cell_size = int(selected_options["cellSize"])
+            width = int(selected_options["bspWidth"]) * cell_size
+            height = int(selected_options["bspHeight"]) * cell_size
+            min_partition_width = int(selected_options["bspMinPartitionWidth"]) * cell_size
+            min_partition_height = int(selected_options["bspMinPartitionHeight"]) * cell_size
             max_treasure_value = int(selected_options["maxTreasureValue"])
+            number_of_floors = int(selected_options["numberOfFloors"])          
         else:
+            cell_size = 15
             size = int(selected_options["size"])
-            width = size * 20
-            height = size * 20
-            min_partition_width = 150
-            min_partition_height = 150
+            width = size * cell_size
+            height = size * cell_size
+            min_partition_width = size
+            min_partition_height = size
+            number_of_floors = 1       
 
-        d = bsp.BSPDungeon(bsp.Rectangle(0, 0, width, height),seed, save_path, db_conn, 1)
+        d = bsp.BSPDungeon(bsp.Rectangle(0, 0, width, height),seed, motif, cell_size, average_player_level,number_of_players,max_treasure_value, save_path, db_conn, number_of_floors)
         dungeon_description = d.generate_dungeon(min_partition_width, min_partition_height)
 
     #for level in dungeon_description:

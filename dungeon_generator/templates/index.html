@@ -39,7 +39,7 @@
             <div class="d-flex flex-row justify-content-between mb-3">
                 <div class="me-3 flex-fill">
                     <label for="numberOfPlayers" class="form-label">Number of Players (1-6)</label>
-                    <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="2" min="1" max="6">
+                    <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="2" min="1" max="6" required>
                 </div>
                 <div class="flex-fill">
                     <label for="averagePlayerLevel" class="form-label">Average player level (1-20)</label>
@@ -51,59 +51,71 @@
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
                             <label for="caRows" class="form-label">Number of Rows</label>
-                            <input type="number" class="form-control" name="caRows" placeholder="50" min="30" max="200">
+                            <input type="number" class="form-control dynamic-input-ca" name="caRows" placeholder="50" min="30" max="200">
                         </div>
                         <div class="flex-fill">
                             <label for="caCols" class="form-label">Number of Columns</label>
-                            <input type="number" class="form-control" name="caCols" placeholder="50" min="30" max="200">
+                            <input type="number" class="form-control dynamic-input-ca" name="caCols" placeholder="50" min="30" max="200">
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
                             <label for="floorProbability" class="form-label">Floor Probability in T = 0 </label>
-                            <input type="number" class="form-control" name="floorProbability" placeholder="0.5" min="0.1" max="0.9" step="any">
+                            <input type="number" class="form-control dynamic-input-ca" name="floorProbability" placeholder="0.5" min="0.1" max="0.9" step="any">
                         </div>
                         <div class="flex-fill">
                             <label for="rockThreshold" class="form-label">Rock Threshold</label>
-                            <input type="number" class="form-control" name="rockThreshold" placeholder="5" min="1" max="8">
+                            <input type="number" class="form-control dynamic-input-ca" name="rockThreshold" placeholder="5" min="1" max="8">
                             
                         </div>
                     </div>
-                    <div>
-                        <label for="numberOfIterations" class="form-label">Number of Cellular Automata Iterations</label>
-                        <input type="number" class="form-control" name="numberOfIterations" placeholder="2" min="2">
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill me-3">
+                            <label for="numberOfIterations" class="form-label">Number of Cellular Automata Iterations</label>
+                            <input type="number" class="form-control dynamic-input-ca" name="numberOfIterations" placeholder="2" min="2">
+                        </div>
+                        <div class="flex-fill">
+                            <label for="numberOfLevels" class="form-label">Number of Levels</label>
+                            <input type="number" class="form-control dynamic-input-ca" name="numberOfLevels" placeholder="1" min="1" max="20">
+                        </div>
                     </div>
                 </div>
                 <div id="optionbspAlgo" class="d-flex flex-column mb-3">
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="bspWidth" class="form-label">Dungeon width</label>
-                            <input type="number" class="form-control" name="bspWidth" placeholder="500" min="500" max="2000">
+                            <label for="bspWidth" class="form-label">Number of Rows</label>
+                            <input type="number" class="form-control dynamic-input-bsp" id="bspWidth" name="bspWidth" placeholder="50" min="30" max="200">
                         </div>
                         <div class="flex-fill">
-                            <label for="bspHeight" class="form-label">Dungeon height</label>
-                            <input type="number" class="form-control" name="bspHeight" placeholder="500" min="500" max="2000">
+                            <label for="bspHeight" class="form-label">Number of Columns</label>
+                            <input type="number" class="form-control dynamic-input-bsp" id="bspHeight" name="bspHeight" placeholder="50" min="30" max="200">
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="bspMinPartitionWidth" class="form-label">Minimal partition width</label>
-                            <input type="number" class="form-control" name="bspMinPartitionWidth" placeholder="500" min="500" max="2000">
+                            <label for="bspMinPartitionWidth" class="form-label">Minimal room width (cells)</label>
+                            <input type="number" class="form-control dynamic-input-bsp" id="bspMinPartitionWidth" name="bspMinPartitionWidth" placeholder="5" min="2" max="100">
                         </div>
                         <div class="flex-fill">
-                            <label for="bspMinPartitionHeight" class="form-label">Minimal partition height</label>
-                            <input type="number" class="form-control" name="bspMinPartitionHeight" placeholder="500" min="500" max="2000">
+                            <label for="bspMinPartitionHeight" class="form-label">Minimal room height (cells)</label>
+                            <input type="number" class="form-control dynamic-input-bsp" id="bspMinPartitionHeight" name="bspMinPartitionHeight" placeholder="5" min="2" max="100">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-row">
+                        <div class="flex-fill">
+                            <label for="numberOfFloors" class="form-label">Number of Floors</label>
+                            <input type="number" class="form-control dynamic-input-bsp" name="numberOfFloors" placeholder="1" min="1" max="20">
                         </div>
                     </div>
                 </div>
                 <div class="d-flex flex-row mb-3">
                     <div class="flex-fill me-3">
                         <label for="maxTreasureValue" class="form-label">Maximal Treasure Value (gp)</label>
-                        <input type="number" class="form-control" id="maxTreasureValue" name="maxTreasureValue" placeholder="100" min="10">
+                        <input type="number" class="form-control dynamic-input" id="maxTreasureValue" name="maxTreasureValue" placeholder="100" min="10">
                     </div>
                     <div class="flex-fill">
                         <label for="cellSize" class="form-label">Cell Size</label>
-                        <input type="number" class="form-control" id="cellSize" name="cellSize" placeholder="10" min="10" max="50">
+                        <input type="number" class="form-control dynamic-input" id="cellSize" name="cellSize" placeholder="10" min="10" max="50">
                     </div>
                 </div>
             </div>
@@ -132,25 +144,52 @@
                     $('.showAdvanced').html("Less Options")
                     $('#dungeonSize').hide()
                     $('#toggledAdvanced').val("True")
+                    var selectedAlgo = $('#selectedAlgo').val()
+                    $('.dynamic-input-' + selectedAlgo).prop('required', true);
+                    $('.dynamic-input').prop('required', true); 
                 } else {
                     $('#advancedOptions').slideUp();
                     $('.showAdvanced').html("More Options")
                     $('#dungeonSize').show()
                     $('#toggledAdvanced').val("False")
+                    var selectedAlgo = $('#selectedAlgo').val()
+                    $('.dynamic-input-' + selectedAlgo).prop('required', false);
+                    $('.dynamic-input').prop('required', false);
                 }
+                
+                
             });
 
             $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
-            $('#optioncaAlgo').show();
+            if ($('#selectedAlgo').val() == "ca"){
+                $('#optioncaAlgo').show();
+            }else{
+                $('#optionbspAlgo').show();
+            }    
 
             $('#selectedAlgo').change(function() {
                 var selectedAlgo = $(this).val();
-                console.log(selectedAlgo)
                 // Hide all option input divs
                 $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
-
                 // Show the corresponding option input div based on the selected value
                 $('#option' + selectedAlgo + 'Algo').show();
+
+                if ($('#advancedOptions').is(':visible')) {
+                    $('.dynamic-input-ca, .dynamic-input-bsp').prop('required', false);
+                    $('.dynamic-input-' + selectedAlgo).prop('required', true);
+                }
+               
+            });
+
+            $('#bspWidth').change(function() {
+                var value = $(this).val();
+                
+                $('#bspMinPartitionWidth').attr('max', Math.round(value / 2))
+            });
+            $('#bspHeight').change(function() {
+                var value = $(this).val();
+                
+                $('#bspMinPartitionHeight').attr('max', Math.round(value / 2))
             });
         });
     </script>

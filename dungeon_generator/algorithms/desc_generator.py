@@ -81,7 +81,6 @@ class DescriptionGenerator:
         both = random.choice([False, True])
         only_item = random.choice([False, True])
         lowest_price = sorted(items, key=lambda x: x["price"])[0]["price"]
-        print(lowest_price)
 
         if self.max_treasure_value < 0: #random itemy / gp podle levelu
             treasure_row = TREASURE[self.encounter_level - 1]
@@ -106,8 +105,6 @@ class DescriptionGenerator:
                 else:
                     gp = random.randint(1, self.rest_of_value)
                     self.rest_of_value -= gp
-
-        print("max value:", self.rest_of_value)
 
         return {"item": item, "gp": gp}
         

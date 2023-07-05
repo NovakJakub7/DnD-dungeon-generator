@@ -23,7 +23,7 @@ F: Number = .5 # pravděpodobnost že bude bunka v čase t=0 volná
 #   vkládání nepřátel, kořisti
 
 class CADungeon:
-    def __init__(self, save_path: str, cell_size: int, motif: str, average_player_level: int, number_of_players: int, max_treasure_value, db_conn = None, number_of_floors: int = 1) -> None:
+    def __init__(self, save_path: str, cell_size: int, motif: str, average_player_level: int, number_of_players: int, max_treasure_value: int, db_conn = None, number_of_floors: int = 1) -> None:
         self.db_conn = db_conn
         self.average_player_level = average_player_level
         self.number_of_players = number_of_players
@@ -414,22 +414,6 @@ class CACave:
 
     def place_start_end(self) -> None:
         """Function randomly places a start and an end inside the map. If there is more floors the end point will be the connection to next floor."""
-        
-        """
-        min_distance = float('inf')
-
-        for cave in self.caves:
-            for cell in cave.cells:
-                x, y = cell
-                distance = min(x, self.rows - 1 - x, y, self.cols - 1 - y)  # Manhattan distance from the edges
-                if distance < min_distance:
-                    min_distance = distance
-                    #min_coord_cave = cave
-                    start_x, start_y = x, y
-
-        #x, y = min_coord_cave.cells[RNG.randint(0, len(min_coord_cave.cells) - 1)]
-        #self.map[x][y] = START
-        """
 
         if self.upper_cave is None:
             # když není patro nad tímhle, udelej random start
@@ -532,9 +516,7 @@ class CACave:
         # projdu nejvetší jeskyně
         for cave in self.caves[:large_caves_end_index]:
             monster_description = desc_generator.generate_monster_description(larger_monsters)
-
             treasure_description = desc_generator.generate_treasure_description(items)
-
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': monster_description, 'treasure': treasure_description})    
         
         # projdu nejmensi jeskyne
@@ -547,7 +529,6 @@ class CACave:
             monster_description = {}
             if RNG.random() < .4:
                 monster_description = desc_generator.generate_monster_description(smaller_monsters)
-
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': monster_description, 'treasure': {}})
 
         dungeon_description = sorted(dungeon_description, key=lambda x: x['cave_id'])

@@ -11,10 +11,28 @@
             <li class="list-group-item">
                 <h3>Level {{level['level_id'] + 1}}</h3>
                 <img src="../static/svg/{{level['svg_name']}}" class="img-fluid" alt="Dungeon map - {{level['level_id']}}">
-                <div class="d-flex flex-row justify-content-center mt-3">
-                    <svg width="20" height="20">
-                        <rect width="20" height="20" style="fill: red;">
-                    </svg>
+                <div class="d-flex flex-row justify-content-between mt-3 align-items-center">
+                    <div class="d-flex flex-row align-items-center">
+                        <svg width="20" height="20">
+                            <rect width="20" height="20" style="fill: blue;">
+                        </svg>
+                        <p class="ms-1 mb-0">Entry</p>
+                    </div>
+                    <div class="d-flex flex-row align-items-center">
+                        <svg width="20" height="20">
+                            <rect width="20" height="20" style="fill: red;">
+                        </svg>
+                        <p class="ms-1 mb-0">Exit</p>
+                    </div>
+                    <figure class="d-flex flex-row align-items-center mb-0">
+                        <img src="../static/svg/staircase_entry.svg" width="40" height="40" class="img-fluid" alt="Staircase entrance">
+                        <figcaption class="ms-1">Staircase entrance</figcaption>
+                    </figure>
+                    <figure class="d-flex flex-row align-items-center mb-0">
+                        <img src="../static/svg/staircase_exit.svg" width="40" height="40" class="img-fluid" alt="Staircase exit">
+                        <figcaption class="ms-1">Staircase exit</figcaption>
+                    </figure>
+                    
                 </div>
                 <div class="d-flex flex-row justify-content-center mt-3">
                     <a class="btn btn-primary" href="../static/svg/{{level['svg_name']}}" download="" role="button">Download</a>   

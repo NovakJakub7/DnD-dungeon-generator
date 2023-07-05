@@ -1,7 +1,9 @@
 import random
 import svgwrite
 import os
+import math
 from svgwrite import pattern
+from .desc_generator import DescriptionGenerator
 
 DISCARD_BY_RATIO = True
 H_RATIO = 0.45
@@ -12,12 +14,18 @@ W_RATIO = 0.45
 #   vkládání nepřátel, kořisti
 
 class BSPDungeon:
-    def __init__(self, bounds, seed, save_path: str, db_conn = None, number_of_floors: int = 1) -> None:
+    def __init__(self, bounds, seed, motif: str, cell_size: int,  average_player_level: int, number_of_players: int, max_treasure_value: int, save_path: str, db_conn = None, number_of_floors: int = 1) -> None:
         self.bounds = bounds
         self.seed = seed
         self.db_conn = db_conn
         self.save_path = save_path
         self.number_of_floors = number_of_floors
+        self.motif = motif
+        self.cell_size = cell_size
+        self.max_treasure_value = max_treasure_value
+        self.average_player_level = average_player_level
+        self.number_of_players = number_of_players
+
 
     def generate_dungeon(self, min_partition_width, min_partition_height):
         floors = []
@@ -26,12 +34,12 @@ class BSPDungeon:
         for i in range(0, self.number_of_floors):
             file_name = f"map_bsp_{i}.svg"
             if i > 0:
-                pass
+                bsp_tree = BSPTree(self.bounds, self.seed + i, self.cell_size, upper_floor=floors[i - 1], floor_depth=i + 1, number_of_floors=self.number_of_floors)
             else:
-                bsp_tree = BSPTree(self.bounds, self.seed)
+                bsp_tree = BSPTree(self.bounds, self.seed, self.cell_size, upper_floor=None, floor_depth=i + 1, number_of_floors=self.number_of_floors)
             floors.append(bsp_tree.create_map(min_partition_width, min_partition_height))
             #place monsters TO DO
-            desc = bsp_tree.place_monsters_items(self.db_conn)
+            desc = bsp_tree.place_monsters_items(self.db_conn, self.average_player_level, self.number_of_players, self.max_treasure_value, self.motif)
             bsp_tree.make_svg(self.save_path, file_name)
 
             level_description = {'level_id': i, 'desc_list': desc, 'svg_name': bsp_tree.svg_name}
@@ -42,18 +50,20 @@ class BSPDungeon:
 
 
 class BSPTree:
-    def __init__(self, bounds, seed, upper_floor = None, floor_depth = 0, number_of_floors = 0) -> None:
+    def __init__(self, bounds, seed: int, cell_size: int, upper_floor = None, floor_depth: int = 0, number_of_floors: int = 0) -> None:
         self.root = BSPNode(bounds)
         self.min_partition_width = 0
         self.min_partition_height = 0
         self.upper_floor = upper_floor #instance BSPTree reprezentujici vrchnejsi level, None kdyz není
-        self.entry = ()
-        self.exit = ()
+        self.entry = None
         self.entry_direction = ""
+        self.exit = None
+        self.exit_direction = ""
         self.entry_size = 0
         self.floor_depth = floor_depth
         self.number_of_floors = number_of_floors
         self.svg_name = ""
+        self.cell_size = cell_size
         self.seed = seed
         random.seed(seed)
         
@@ -63,22 +73,20 @@ class BSPTree:
         self.min_partition_width = min_partition_width
         self.min_partition_height = min_partition_height
 
-        min_room_width = min_partition_width / 100 * 80
-        min_room_height = min_partition_height / 100 * 80
+        min_room_width = math.ceil(min_partition_width / 100 * 80 / self.cell_size) * self.cell_size
+        min_room_height = math.ceil(min_partition_height / 100 * 80 / self.cell_size) * self.cell_size
 
-        corridor_size = (min_partition_width + min_partition_height) / 20
-
-        self.partition(min_partition_width, min_partition_height)
-        self.create_rooms(min_room_width, min_room_height)
-        self.create_corridors(corridor_size)
+        self.partition(min_partition_width + 2 * self.cell_size, min_partition_height + 2 * self.cell_size, self.cell_size)
+        self.create_rooms(min_room_width, min_room_height, self.cell_size)
+        self.create_corridors()
         self.place_entry_exit()
 
         return self
 
 
-    def partition(self, min_width, min_height) -> None:
+    def partition(self, min_width, min_height, cell_size) -> None:
         """Apply space partitioning on root node."""
-        self.root.partition(min_width, min_height)
+        self.root.partition(min_width, min_height, cell_size)
         
 
     def get_leaf_nodes(self) -> list:
@@ -86,15 +94,15 @@ class BSPTree:
         return self.root.get_leaf_nodes()
 
 
-    def create_rooms(self, min_width, min_height) -> None:
+    def create_rooms(self, min_width, min_height, cell_size) -> None:
         """Creates a room for every leaf node in tree."""
         for node in self.get_leaf_nodes():
-            node.create_room(min_width, min_height)
+            node.create_room(min_width, min_height, cell_size)
 
 
-    def create_corridors(self, corridor_size) -> None:
+    def create_corridors(self) -> None:
         """Creates corridors between rooms of sibling nodes."""
-        self.root.create_corridors(corridor_size)
+        self.root.create_corridors(self.cell_size)
 
 
     def get_rooms(self) -> list:
@@ -106,55 +114,84 @@ class BSPTree:
             rooms.append(node.room)
 
         return rooms
+    
+
+    def get_corridors(self) -> list:
+        """Returns a list of all corridors"""
+        root = self.root
+        corridors = root.get_corridors()
+
+        return corridors
 
     def place_entry_exit(self) -> None:
         # POKRAČUJEME ZDE
         # mám souřadnice vstupu podle strany
-        # dodelat: exit, vykreslovani spravne
+        print("Depth:", self.floor_depth)
         rooms = self.get_rooms()   
-        
+        directions = ["left", "right", "top", "bottom"]
+        entry_direction = ""
+        self.entry_size = math.ceil(self.min_partition_width / 100 * 25)
+       
         # nemam vrchní patro, udelam random vstup na nejaké straně
         if self.upper_floor is None:
             # START
-            self.entry_size = self.min_partition_width / 100 * 20
-            entry_direction = random.choice(["left", "right", "top", "bottom"])
+            entry_direction = random.choice(directions)
             #entry_direction = "left"
-
-            if entry_direction == "left":
-                entry_room = min(rooms, key=lambda x: x.left)
-                entry_point = (entry_room.left, random.randint(entry_room.top + self.entry_size, entry_room.bottom - self.entry_size))
-            elif entry_direction == "right":
-                entry_room = max(rooms, key=lambda x: x.right)
-                entry_point = (entry_room.right, random.randint(entry_room.top + self.entry_size, entry_room.bottom - self.entry_size))
-            elif entry_direction == "top":
-                entry_room = min(rooms, key=lambda x: x.top)
-                entry_point = (random.randint(entry_room.left + self.entry_size, entry_room.right - self.entry_size), entry_room.top)
-            else: # bottom
-                entry_room = max(rooms, key=lambda x: x.bottom)
-                entry_point = (random.randint(entry_room.left + self.entry_size, entry_room.right - self.entry_size), entry_room.bottom)
-
-            print(entry_direction, entry_point)
+            entry_room, entry_point  = self.make_random_door(rooms, entry_direction)
+            print("Entry direction:", entry_direction, "Entry point:", entry_point)
             self.entry_direction = entry_direction
-            self.entry = entry_point
-
-            #EXIT
-            # pokud je jen jedno patro nebo jsem poslední patro tak exit v random roomce
-            if self.number_of_floors == 0 or self.floor_depth == self.number_of_floors:
-                exit_direction = random.choice(["left", "right", "top", "bottom"])
-                # nechceme stejny exit smer
-                while exit_direction == entry_direction:
-                    exit_direction = random.choice(["left", "right", "top", "bottom"])
-                
+            self.entry = entry_point         
         else: # mam vrchní patro, udělam vstup (schodiste) z exitu predchoziho patra (patro nahore nebo dole?)
-            # exit bud v prvnim patre jako vstup nebo kdyz jdeme dolu tak exit jinam?
-            pass           
+            # mel by byt rectangle schodiste
+            upper_floor_exit = self.upper_floor.exit
+            print("Upper floor:", upper_floor_exit)           
+            entry_room = self.find_closest_room(upper_floor_exit, rooms)
+            staircase, entry_direction = self.make_staircase(entry_room)
+            self.entry_direction = entry_direction
+            self.entry = staircase
 
+        #EXIT
+        possible_exit_rooms = rooms
+        possible_exit_rooms.remove(entry_room)
+        # pokud je jen jedno patro nebo jsem poslední patro tak exit v random roomce
+        if self.number_of_floors == 0 or self.floor_depth == self.number_of_floors:
+            # vybereme ze smeru, kde neni stejny smer jako entry
+            exit_directions = directions
+            if entry_direction != "":
+                exit_directions.remove(entry_direction)
+            exit_direction = random.choice(exit_directions)
+            exit_room, exit_point = self.make_random_door(possible_exit_rooms, exit_direction)
+            print("Exit direction:", exit_direction, "Exit point:", exit_point)    
+            self.exit_direction = exit_direction
+            self.exit = exit_point     
+        else:
+            exit_room = random.choice(possible_exit_rooms) 
+            staircase, exit_direction = self.make_staircase(exit_room)
+            print("Exit staircase direction", exit_direction)
+            self.exit_direction = exit_direction
+            self.exit = staircase
 
-    def place_monsters_items(self, db_conn):
+    def place_monsters_items(self, db_conn, average_player_level, number_of_players, max_treasure_value, motif):
         """Function creates dictionary describing item and monster placement inside the dungeon."""
         rooms = self.get_rooms()
         room_sizes = []
         number_of_rooms = len(rooms)
+        encounter_level = math.floor(average_player_level * number_of_players / 4)
+        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
+        smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
+        larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
+        smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level])
+        larger_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(larger_monsters_sizes))), larger_monsters_sizes + [encounter_level])
+        items = self.query_db(db_conn, 'select * from items')
+        dungeon_description = []
+        available_motives = []
+
+        if motif == "Random":
+            motives = self.query_db(db_conn, 'select distinct motif from monsters')
+            for motive in motives:
+                available_motives.append(motive['motif'])
+            motif = random.choice(available_motives)
+
         for room in rooms:
             room_sizes.append(room.width * room.height)
         room_sizes.sort(reverse=True)
@@ -170,41 +207,32 @@ class BSPTree:
             small_rooms_index = number_of_rooms - 4
 
         large_size = room_sizes[large_rooms_index]
-        small_size = room_sizes[small_rooms_index]
-
-        large_monsters = self.query_db(db_conn, 'select * from monsters where size = ?', ['Large'])
-        medium_monsters = self.query_db(db_conn, 'select * from monsters where size = ?', ['Medium'])
-        small_monsters = self.query_db(db_conn, 'select * from monsters where size = ?', ['Small'])
-        items = self.query_db(db_conn, 'select * from items')
-        dungeon_description = []
+        small_size = room_sizes[small_rooms_index] 
         
         for room in rooms:
             room_size = room.width * room.height
             if room_size >= large_size: # velke
-                chosen_monsters = []
-                chosen_monsters.append(large_monsters[random.randint(0, len(large_monsters) - 1)])
-                chosen_monsters.append(medium_monsters[random.randint(0, len(medium_monsters) - 1)])
-
-                chosen_item = items[random.randint(0, len(items) - 1)]
-
-                dungeon_description.append({'cave_id': rooms.index(room), 'monsters': chosen_monsters, 'item': chosen_item}) 
+                monster_description = desc_generator.generate_monster_description(larger_monsters)
+                treasure_description = desc_generator.generate_treasure_description(items)
+                dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': treasure_description})    
             elif room_size < large_size and room_size > small_size: # medium
-                chosen_monsters = []
-                if random.random() < .5:
-                    if random.random() < .5:
-                        chosen_monsters.append(small_monsters[random.randint(0, len(small_monsters) - 1)])
-                        chosen_monsters.append(medium_monsters[random.randint(0, len(medium_monsters) - 1)])
-                    else:
-                        chosen_monsters.append(small_monsters[random.randint(0, len(small_monsters) - 1)])
-                        chosen_monsters.append(small_monsters[random.randint(0, len(small_monsters) - 1)])
-
-                dungeon_description.append({'cave_id': rooms.index(room), 'monsters': chosen_monsters, 'item': None})
-
+                monster_description = {}
+                if random.random() < .4:
+                    monster_description = desc_generator.generate_monster_description(smaller_monsters)
+                dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': {}})
             else: # male
-                chosen_item = items[random.randint(0, len(items) - 1)]
-                dungeon_description.append({'cave_id': rooms.index(room), 'monsters': [], 'item': chosen_item})
+                treasure_description = desc_generator.generate_treasure_description(items)
+                dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': {}, 'treasure': treasure_description})
 
-        return sorted(dungeon_description, key=lambda x: x['cave_id'])
+        dungeon_description = sorted(dungeon_description, key=lambda x: x['cave_id'])
+
+        if desc_generator.rest_of_value > 0:
+            random_desc = random.choice(dungeon_description)
+            while not random_desc["treasure"]:
+                random_desc = random.choice(dungeon_description)
+            random_desc["treasure"]["gp"] += desc_generator.rest_of_value
+
+        return dungeon_description
 
 
     def query_db(self, db_conn, query, args=(), one=False):
@@ -212,7 +240,97 @@ class BSPTree:
         rv = cur.fetchall()
         cur.close()
         return (rv[0] if rv else None) if one else rv
+
+
+    def is_room_inside(self, outer_rect, inner_rect):
+        if (
+            outer_rect.left <= inner_rect.left and
+            outer_rect.top <= inner_rect.top and
+            outer_rect.right >= inner_rect.right and
+            outer_rect.bottom >= inner_rect.bottom
+        ):
+            return True
+
+        return False
+
+
+    def find_closest_room(self, target_room, rooms):
+        closest_room = None
+        closest_distance = float('inf')
+        target_room_center_x, target_room_center_y = target_room.center()
+
+        for room in rooms:
+            room_center_x, room_center_y = room.center()
+            distance = (target_room_center_x - room_center_x) ** 2 + (target_room_center_y - room_center_y) ** 2
+            if distance < closest_distance:
+                closest_distance = distance
+                closest_room = room
+
+        return closest_room
+
+
+    def make_staircase(self, room):
+        direction = random.choice(["left", "right", "top", "bottom"])
+        staircase = Rectangle(0,0,0,0)
+        staircase_width = self.cell_size * 2
+        staircase_heigth = self.cell_size *2
+        if direction == "left":
+            if random.random() < .5: # from top
+                staircase = Rectangle(room.left, room.top, staircase_width, staircase_heigth)
+            else: # from bottom
+                staircase = Rectangle(room.left, room.bottom - staircase_heigth, staircase_width, staircase_heigth)
+        elif direction == "right":
+            if random.random() < .5: # from top
+                staircase = Rectangle(room.right - staircase_width, room.top, staircase_width, staircase_heigth)
+            else: # from bottom
+                staircase = Rectangle(room.right - staircase_width, room.bottom - staircase_heigth, staircase_width, staircase_heigth)
+        elif direction == "top":
+            if random.random() < .5: # from left
+                staircase = Rectangle(room.left, room.top, staircase_width, staircase_heigth)
+            else: # from right
+                staircase = Rectangle(room.right - staircase_width, room.top, staircase_width, staircase_heigth)
+        elif direction == "bottom":
+            if random.random() < .5: # from left
+                staircase = Rectangle(room.left, room.bottom - self.cell_size, staircase_width, staircase_heigth)
+            else: # from right
+                staircase = Rectangle(room.right - staircase_width, room.bottom - self.cell_size, staircase_width, staircase_heigth)
+
+        corridors = self.get_corridors()
+
+        if self.is_corridor_through_room(corridors, staircase):
+            print("CORRIDOR IS THROUGH")
+            return self.make_staircase(room)
+        else:
+            return (staircase, direction)
     
+
+    def is_corridor_through_room(self, corridors, room):
+        for rect in corridors:
+            if (
+                rect.right > room.left and        # Right edge of rect is to the right of room's left edge
+                rect.left < room.right and        # Left edge of rect is to the left of room's right edge
+                rect.bottom > room.top and        # Bottom edge of rect is below room's top edge
+                rect.top < room.bottom            # Top edge of rect is above room's bottom edge
+            ):
+                return True
+        return False
+
+
+    def make_random_door(self, rooms, direction):
+        door_point = ()
+        if direction == "left":
+            door_room = min(rooms, key=lambda x: x.left)
+            door_point = (door_room.left, random.randrange(door_room.top + self.cell_size, door_room.bottom - self.cell_size + 1, self.cell_size))
+        elif direction == "right":
+            door_room = max(rooms, key=lambda x: x.right)
+            door_point = (door_room.right, random.randrange(door_room.top + self.cell_size, door_room.bottom - self.cell_size + 1, self.cell_size))
+        elif direction == "top":
+            door_room = min(rooms, key=lambda x: x.top)
+            door_point = (random.randrange(door_room.left + self.cell_size, door_room.right - self.cell_size + 1, self.cell_size), door_room.top)
+        else: # bottom
+            door_room = max(rooms, key=lambda x: x.bottom)
+            door_point = (random.randrange(door_room.left + self.cell_size, door_room.right - self.cell_size + 1, self.cell_size), door_room.bottom)
+        return (door_room, door_point)
 
     def make_svg(self, save_path, file_name):
         """Generate svg image from BSPTree and save it to path under the file name."""
@@ -231,17 +349,96 @@ class BSPTree:
         map.fill('black')
         map.stroke('black', width=2)
 
-        self.root.draw_corridors(dwg)
-        self.root.draw_rooms(dwg)
-
-        entry_x, entry_y = self.entry
-        if self.entry_direction == "left" or self.entry_direction == "right":   
-            dwg.add(dwg.rect((entry_x, entry_y), (10, self.entry_size), fill="blue"))
-        else:
-            dwg.add(dwg.rect((entry_x, entry_y), (self.entry_size, 10), fill="blue"))
+        room_numbers = []
+        room_numbers = self.root.draw_rooms(dwg, self.cell_size)
+        self.root.draw_corridors(dwg, self.cell_size)
+        self.draw_misc(dwg)
+        
+        for number in room_numbers:
+            id = number["id"]
+            x = number["insert_x"]
+            y = number["insert_y"]
+            text = dwg.text(id, insert=(x,y), text_anchor='middle', alignment_baseline="middle", font_size=20, fill='black')
+            dwg.add(text)        
         
         dwg.save()
 
+
+    def draw_misc(self, dwg):  
+        if self.entry is not None:
+            print("SVG entry:", self.entry)
+            if isinstance(self.entry, Rectangle):
+                staircase_group = dwg.g()
+                stripe_count = 8
+                pattern_width = self.entry.width
+                pattern_height = self.entry.height
+                stripe_width = pattern_width / stripe_count
+                
+                y = self.entry.top
+                for i in range(stripe_count):
+                    x = self.entry.left + (i * stripe_width)
+                   
+                    stripe = dwg.rect(insert=(x, y), size=(stripe_width, pattern_height), fill='white', stroke='black')
+                    staircase_group.add(stripe)
+
+                if self.entry_direction == "top" or self.entry_direction == "bottom":
+                    staircase_group.rotate(90, center=(self.entry.left + pattern_width / 2, self.entry.top + pattern_height / 2))
+
+                dwg.add(dwg.rect((self.entry.left, self.entry.top), (self.entry.width, self.entry.height), fill="white", stroke="blue"))
+                dwg.add(staircase_group)  
+            else:
+                entry_x, entry_y = self.entry
+                if self.entry_direction == "left": 
+                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size), fill="white", stroke="blue"))  
+                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size / 3, self.cell_size), fill="brown", stroke="black"))
+                elif self.entry_direction == "right":
+                    dwg.add(dwg.rect((entry_x - self.cell_size / 3, entry_y), (self.cell_size / 3, self.cell_size), fill="brown", stroke="black"))
+                elif self.entry_direction == "top":
+                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size / 3), fill="brown", stroke="black"))
+                else:
+                    dwg.add(dwg.rect((entry_x, entry_y - self.cell_size / 3), (self.cell_size, self.cell_size / 3), fill="brown", stroke="black"))
+
+        if self.exit is not None:
+            print("SVG exit:", self.exit)
+            if isinstance(self.exit, Rectangle):
+                staircase_group = dwg.g()
+                stripe_count = 8
+                pattern_width = self.exit.width
+                pattern_height = self.exit.height
+                stripe_width = pattern_width / stripe_count
+                
+                for i in range(stripe_count):
+                    if self.exit_direction == "right":
+                        x = self.exit.left + (i * stripe_width)
+                        y = self.exit.top + i
+                        width = stripe_width
+                        height = pattern_height - i * 2
+                    else:
+                        x = self.exit.left + (i * stripe_width)
+                        y = (self.exit.top + stripe_count) - i
+                        width = stripe_width
+                        height = (pattern_height - stripe_count * 2) + i * 2
+                    
+                    stripe = dwg.rect(insert=(x, y), size=(width, height), fill='white', stroke='black')
+                    staircase_group.add(stripe)
+
+                if self.exit_direction == "top":
+                    staircase_group.rotate(90, center=(self.entry.left + pattern_width / 2, self.entry.top + pattern_height / 2))
+                elif self.exit_direction == "bottom":
+                    staircase_group.rotate(270, center=(self.entry.left + pattern_width / 2, self.entry.top + pattern_height / 2))
+                dwg.add(dwg.rect((self.exit.left, self.exit.top), (self.exit.width, self.exit.height), fill="white", stroke="red"))
+                dwg.add(staircase_group)
+                
+            else:
+                exit_x, exit_y = self.exit
+                if self.exit_direction == "left":   
+                    dwg.add(dwg.rect((exit_x, exit_y), (self.cell_size, self.cell_size), fill="red"))
+                elif self.exit_direction == "right":
+                    dwg.add(dwg.rect((exit_x - self.cell_size, exit_y), (self.cell_size, self.cell_size), fill="red"))
+                elif self.exit_direction == "top":
+                    dwg.add(dwg.rect((exit_x, exit_y), (self.cell_size, self.cell_size), fill="red"))
+                else:
+                    dwg.add(dwg.rect((exit_x, exit_y - self.cell_size), (self.cell_size, self.cell_size), fill="red"))
 
 class BSPNode:
     def __init__(self, bounds) -> None:
@@ -253,7 +450,7 @@ class BSPNode:
         self.corridors = []
 
 
-    def partition(self, min_width, min_height):
+    def partition(self, min_width, min_height, cell_size):
         """Create new nodes by dividing the node area along a horizontal or vertical line
           and repeat on new nodes until the node bounds are smaller or equal to minimum size."""
         if self.bounds.width <= 2*min_width or self.bounds.height <= 2*min_height:
@@ -262,35 +459,38 @@ class BSPNode:
         split_horizontal = random.choice([True, False])
         
         if split_horizontal:
-            split_y = random.randint(self.bounds.top + min_height, self.bounds.bottom - min_height)
+            split_y = round(random.randint(self.bounds.top + min_height, self.bounds.bottom - min_height) / cell_size) * cell_size
             rect_1 = Rectangle(self.bounds.left, self.bounds.top, self.bounds.width, split_y - self.bounds.top)
             rect_2 = Rectangle(self.bounds.left, split_y, self.bounds.width, self.bounds.bottom - split_y)
             if DISCARD_BY_RATIO:
                 if (rect_1.height / rect_1.width) < H_RATIO or (rect_2.height / rect_2.width) < H_RATIO:
-                    self.partition(min_width, min_height)
+                    self.partition(min_width, min_height, cell_size)
                     return
         else:
-            split_x = random.randint(self.bounds.left + min_width, self.bounds.right - min_width)
+            split_x = round(random.randint(self.bounds.left + min_width, self.bounds.right - min_width) / cell_size) * cell_size
             rect_1 = Rectangle(self.bounds.left, self.bounds.top, split_x - self.bounds.left, self.bounds.height)
             rect_2 = Rectangle(split_x, self.bounds.top, self.bounds.right - split_x, self.bounds.height)
             if DISCARD_BY_RATIO:
                 if (rect_1.width / rect_1.height) < W_RATIO or (rect_2.width / rect_2.height) < W_RATIO:
-                    self.partition(min_width, min_height)
+                    self.partition(min_width, min_height, cell_size)
                     return
         
         self.left_child = BSPNode(rect_1)
         self.right_child = BSPNode(rect_2)
 
-        self.left_child.partition(min_width, min_height)
-        self.right_child.partition(min_width, min_height)
+        self.left_child.partition(min_width, min_height, cell_size)
+        self.right_child.partition(min_width, min_height, cell_size)
 
 
-    def create_room(self, min_width, min_height):
+    def create_room(self, min_width, min_height, cell_size):
         """Places a room within nodes boundaries."""
-        room_width = random.randint(min_width, self.bounds.width - 2)
-        room_height = random.randint(min_height, self.bounds.height - 2)
-        room_left = random.randint(self.bounds.left + 1, self.bounds.right - room_width - 1)
-        room_top = random.randint(self.bounds.top + 1, self.bounds.bottom - room_height - 1)
+       
+        room_width = random.randrange(min_width, self.bounds.width - cell_size * 2 + 1, cell_size) 
+        room_height = random.randrange(min_height, self.bounds.height - cell_size * 2 + 1, cell_size)
+        #print(self.bounds.right - room_width - cell_size + 1)
+        room_left = random.randrange((math.ceil(self.bounds.left / cell_size) * cell_size) + cell_size, self.bounds.right - room_width - cell_size + 1, cell_size)
+        room_top = random.randrange((math.ceil(self.bounds.top / cell_size) * cell_size) + cell_size, self.bounds.bottom - room_height - cell_size + 1, cell_size)
+
         self.room = Rectangle(room_left, room_top, room_width, room_height)
      
 
@@ -318,67 +518,70 @@ class BSPNode:
         #point_1 = (random.randint(room_1.left + corridor_size, room_1.right - corridor_size), random.randint(room_1.top + corridor_size, room_1.bottom - corridor_size))
         #point_2 = (random.randint(room_2.left + corridor_size, room_2.right - corridor_size), random.randint(room_2.top + corridor_size, room_2.bottom - corridor_size))
 
-        point_1 = room_1.center()
-        point_2 = room_2.center()
+        point_1 = room_1.center_rounded(corridor_size)
+        point_2 = room_2.center_rounded(corridor_size)
 
         horizontal_dif = point_2[0] - point_1[0]
         vertical_dif = point_2[1] - point_1[1]
+
+        horizontal_dif_rounded = round(abs(horizontal_dif) / corridor_size) * corridor_size
+        vertical_dif_rounded  = round(abs(vertical_dif) / corridor_size) * corridor_size
 
         # room_1 is on the right of room_2
         if horizontal_dif < 0:
             if vertical_dif < 0: # room_2 is above room_1
                 if random.choice([True, False]):
-                    self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif), corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif_rounded), corridor_size))
                     self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif)))
                 else:
-                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
-                    self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif_rounded) + corridor_size, corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif_rounded)))
             elif vertical_dif > 0: # room_1 is above room_2
                 if random.choice([True, False]):
-                    self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif), corridor_size))
-                    self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_2[0], point_1[1], abs(horizontal_dif_rounded), corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
                 else:
-                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
-                    self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif_rounded) + corridor_size, corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
             else: # same vertical
-                self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif), corridor_size))
+                self.corridors.append(Rectangle(point_2[0], point_2[1], abs(horizontal_dif_rounded), corridor_size))
         elif horizontal_dif > 0:   # room_2 is on the right of room_1
             if vertical_dif < 0:   # room_2 is above room_1
                 if random.choice([True, False]):
-                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif), corridor_size))
-                    self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif_rounded), corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_2[1], corridor_size, abs(vertical_dif_rounded)))
                 else:
-                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif) + corridor_size, corridor_size))
-                    self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif_rounded) + corridor_size, corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif_rounded)))
             elif vertical_dif > 0:  # room_1 is above room_2
                 if random.choice([True, False]):
-                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif), corridor_size))
-                    self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif_rounded), corridor_size))
+                    self.corridors.append(Rectangle(point_2[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
                 else:
-                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif) + corridor_size, corridor_size))
-                    self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif)))
+                    self.corridors.append(Rectangle(point_1[0], point_2[1], abs(horizontal_dif_rounded) + corridor_size, corridor_size))
+                    self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
             else:
-                self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif), corridor_size))
+                self.corridors.append(Rectangle(point_1[0], point_1[1], abs(horizontal_dif_rounded), corridor_size))
         else:   # same horizontal
             if vertical_dif < 0: 
-                self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif)))
+                self.corridors.append(Rectangle(point_2[0], point_2[1], corridor_size, abs(vertical_dif_rounded)))
             elif vertical_dif > 0:
-                self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif)))
+                self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
 
 
-    def draw_rooms(self, svg_document):
+    def draw_rooms(self, svg_document, cell_size):
         floor_index = 0
+        room_numbers = []
         for node in self.get_leaf_nodes():
             floor_index = self.get_leaf_nodes().index(node)
             pattern = svg_document.defs.add(
-                svg_document.pattern(size=(20, 20), patternUnits="userSpaceOnUse"))
-            pattern.add(svg_document.rect((0, 0), (20, 20), fill="white", stroke="black"))
-
+                svg_document.pattern(size=(cell_size, cell_size), patternUnits="userSpaceOnUse"))
+            pattern.add(svg_document.rect((0, 0), (cell_size, cell_size), fill="white", stroke="gray"))
             group = svg_document.add(svg_document.g())
-            group.add(svg_document.rect((node.room.left, node.room.top), (node.room.width, node.room.height), fill=pattern.get_paint_server()))
-            group.add(svg_document.text(str(floor_index + 1), insert=((node.room.left + node.room.right)/2,(node.room.bottom + node.room.top)/ 2), text_anchor='middle', alignment_baseline="middle", font_size=20, fill='black'))
-
-        
+            group.add(svg_document.rect((node.room.left, node.room.top), (node.room.width, node.room.height), fill=pattern.get_paint_server(), stroke="black",  stroke_width=1))
+            room_numbers.append({"id": str(floor_index + 1), "insert_x": (node.room.left + node.room.right)/2, "insert_y": (node.room.bottom + node.room.top)/2})
+            #group.add(svg_document.rect((node.bounds.left, node.bounds.top), (node.bounds.width, node.bounds.height), stroke="green"))
+        return room_numbers    
 
     def create_corridors(self, corridor_size):
         if self.left_child is None and self.right_child is None:
@@ -390,19 +593,37 @@ class BSPNode:
         self.create_sibling_corridor(self.left_child, self.right_child, corridor_size)
 
 
-    def draw_corridors(self, svg_document):
+    def draw_corridors(self, svg_document, cell_size):
         if self.left_child is None and self.right_child is None:
             return
-        
+        pattern = svg_document.defs.add(
+            svg_document.pattern(size=(cell_size, cell_size), patternUnits="userSpaceOnUse"))
+        pattern.add(svg_document.rect((0, 0), (cell_size, cell_size), fill="white", stroke="gray"))
         if self.corridors:
             for corridor in self.corridors:
                 group = svg_document.add(svg_document.g())
-                map_corridor = group.add(svg_document.rect((corridor.left, corridor.top), (corridor.width, corridor.height), fill='white'))   
+                map_corridor = group.add(svg_document.rect((corridor.left, corridor.top), (corridor.width, corridor.height), fill=pattern.get_paint_server()))   
                 #corridor_id = group.add(svg_document.text(id(self), insert=(corridor.left + 2, corridor.top - 2)))
                 #corridor_id.fill('white')
 
-        self.left_child.draw_corridors(svg_document)
-        self.right_child.draw_corridors(svg_document)
+        self.left_child.draw_corridors(svg_document, cell_size)
+        self.right_child.draw_corridors(svg_document, cell_size)
+
+    def get_corridors(self):
+        corridors = []
+        if self is None:
+            return []
+
+        if self.corridors:
+            corridors.extend(self.corridors)
+
+        if self.left_child is not None:
+            corridors.extend(self.left_child.get_corridors())
+
+        if self.right_child is not None:
+            corridors.extend(self.right_child.get_corridors())
+        
+        return corridors
         
 
 class Rectangle:
@@ -420,10 +641,43 @@ class Rectangle:
         return (center_x, center_y)
 
 
+    def center_rounded(self, rounded_to_multiple) -> tuple:
+        center_x = round(((self.left + self.right)/2) / rounded_to_multiple) * rounded_to_multiple
+        center_y = round(((self.top + self.bottom)/2) / rounded_to_multiple) * rounded_to_multiple
+        return (center_x, center_y)
+
 if __name__ == "__main__":
-    bsp = BSPTree(Rectangle(0, 0, 800, 800), 1235)
-    bsp.create_map(150, 150)
-    bsp.make_svg(save_path=r"C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\static\svg", file_name=r"map_bsp.svg")
     
+    #bsp = BSPTree(Rectangle(0, 0, 800, 800), 545, 10)
+    #bsp.create_map(150, 150)
+    #bsp.make_svg(save_path=r"C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\static\svg", file_name=r"map_bsp.svg")
     
+
+    # Create a new SVG document
+    dwg = svgwrite.Drawing('staircase_exit.svg')
+
+    # Define the pattern properties
+    pattern_width = 40
+    pattern_height = 40
+    stripe_count = 8
+    stripe_width = pattern_width / stripe_count
+    # Create a group element for the pattern
+    pattern_group = dwg.g()
+    
+    # Create the stripes of the pattern
+    for i in range(stripe_count):
+        x = i * stripe_width
+        y = 0 + i
+        width = stripe_width
+        height = pattern_height - i * 2
+                   
+        stripe = dwg.rect(insert=(x, y), size=(width, height), fill='white', stroke='black')
+        pattern_group.add(stripe)
+
+    #dwg.add(dwg.rect(insert=(0,0), size=(pattern_width, pattern_height), fill="white", stroke="blue"))
+    # Add the pattern group to the SVG document
+    dwg.add(pattern_group)
+
+    # Save the SVG document
+    dwg.save()
 
