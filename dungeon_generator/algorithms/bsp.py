@@ -173,24 +173,25 @@ class BSPTree:
 
     def place_monsters_items(self, db_conn, average_player_level, number_of_players, max_treasure_value, motif):
         """Function creates dictionary describing item and monster placement inside the dungeon."""
-        rooms = self.get_rooms()
-        room_sizes = []
-        number_of_rooms = len(rooms)
-        encounter_level = math.floor(average_player_level * number_of_players / 4)
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
-        smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
-        larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
-        smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level])
-        larger_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(larger_monsters_sizes))), larger_monsters_sizes + [encounter_level])
-        items = self.query_db(db_conn, 'select * from items')
-        dungeon_description = []
         available_motives = []
-
         if motif == "Random":
             motives = self.query_db(db_conn, 'select distinct motif from monsters')
             for motive in motives:
                 available_motives.append(motive['motif'])
             motif = random.choice(available_motives)
+        encounter_level = math.floor(average_player_level * number_of_players / 4)
+        if encounter_level == 0:
+            encounter_level = 1
+        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
+        rooms = self.get_rooms()
+        room_sizes = []
+        number_of_rooms = len(rooms)
+        smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
+        larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
+        smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level, motif])
+        larger_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(larger_monsters_sizes))), larger_monsters_sizes + [encounter_level, motif])
+        items = self.query_db(db_conn, 'select * from items')
+        dungeon_description = []
 
         for room in rooms:
             room_sizes.append(room.width * room.height)
@@ -212,13 +213,17 @@ class BSPTree:
         for room in rooms:
             room_size = room.width * room.height
             if room_size >= large_size: # velke
-                monster_description = desc_generator.generate_monster_description(larger_monsters)
+                if larger_monsters:
+                    monster_description = desc_generator.generate_monster_description(larger_monsters)
+                else:
+                    monster_description = desc_generator.generate_monster_description(smaller_monsters)
                 treasure_description = desc_generator.generate_treasure_description(items)
                 dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': treasure_description})    
             elif room_size < large_size and room_size > small_size: # medium
                 monster_description = {}
                 if random.random() < .4:
-                    monster_description = desc_generator.generate_monster_description(smaller_monsters)
+                    if smaller_monsters:
+                        monster_description = desc_generator.generate_monster_description(smaller_monsters)
                 dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': {}})
             else: # male
                 treasure_description = desc_generator.generate_treasure_description(items)
@@ -423,9 +428,9 @@ class BSPTree:
                     staircase_group.add(stripe)
 
                 if self.exit_direction == "top":
-                    staircase_group.rotate(90, center=(self.entry.left + pattern_width / 2, self.entry.top + pattern_height / 2))
+                    staircase_group.rotate(90, center=(self.exit.left + pattern_width / 2, self.exit.top + pattern_height / 2))
                 elif self.exit_direction == "bottom":
-                    staircase_group.rotate(270, center=(self.entry.left + pattern_width / 2, self.entry.top + pattern_height / 2))
+                    staircase_group.rotate(270, center=(self.exit.left + pattern_width / 2, self.exit.top + pattern_height / 2))
                 dwg.add(dwg.rect((self.exit.left, self.exit.top), (self.exit.width, self.exit.height), fill="white", stroke="red"))
                 dwg.add(staircase_group)
                 

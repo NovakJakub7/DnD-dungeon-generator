@@ -120,7 +120,7 @@ class CACave:
                 elif cell == EXIT:
                     dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='red'))
                 else:
-                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='black'))
+                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='black', stroke="black"))
         #dwg.viewbox(0, 0, CELL_SIZE * self.cols, CELL_SIZE * self.rows)
         dwg.save()
 
@@ -232,7 +232,6 @@ class CACave:
                         self.map[x][y] = ROCK
                     self.caves.pop(index_to_delete)
         """
-        print("CAVES:", self.caves)
         if self.caves:
             self.caves[0].main_cave = True 
             self.caves[0].accessible_from_main_cave = True
@@ -485,21 +484,23 @@ class CACave:
 
     def place_monsters_items(self, db_conn, motif, average_level, number_of_players, max_treasure_value) -> list:
         """Function creates dictionary describing item and monster placement inside the dungeon."""
-        encounter_level = math.floor(average_level * number_of_players / 4)
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
-        smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
-        larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
-        smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level])
-        larger_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ?".format(','.join(['?'] * len(larger_monsters_sizes))), larger_monsters_sizes + [encounter_level])
-        items = self.query_db(db_conn, 'select * from items')
-        dungeon_description = []
         available_motives = []
-
         if motif == "Random":
             motives = self.query_db(db_conn, 'select distinct motif from monsters')
             for motive in motives:
                 available_motives.append(motive['motif'])
             motif = RNG.choice(available_motives)
+        encounter_level = math.floor(average_level * number_of_players / 4)
+        if encounter_level == 0:
+            encounter_level = 1
+        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
+        smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
+        larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
+        smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level, motif])
+        larger_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(larger_monsters_sizes))), larger_monsters_sizes + [encounter_level, motif])
+        items = self.query_db(db_conn, 'select * from items')
+        dungeon_description = []
+        
         number_of_caves = len(self.caves)
         if number_of_caves < 1:
             return []
@@ -515,7 +516,10 @@ class CACave:
         
         # projdu nejvetší jeskyně
         for cave in self.caves[:large_caves_end_index]:
-            monster_description = desc_generator.generate_monster_description(larger_monsters)
+            if larger_monsters:
+                monster_description = desc_generator.generate_monster_description(larger_monsters)
+            else:
+                monster_description = desc_generator.generate_monster_description(smaller_monsters)
             treasure_description = desc_generator.generate_treasure_description(items)
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': monster_description, 'treasure': treasure_description})    
         
@@ -528,7 +532,8 @@ class CACave:
         for cave in self.caves[large_caves_end_index:smallest_caves_start_index]:
             monster_description = {}
             if RNG.random() < .4:
-                monster_description = desc_generator.generate_monster_description(smaller_monsters)
+                if smaller_monsters:
+                    monster_description = desc_generator.generate_monster_description(smaller_monsters)
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': monster_description, 'treasure': {}})
 
         dungeon_description = sorted(dungeon_description, key=lambda x: x['cave_id'])

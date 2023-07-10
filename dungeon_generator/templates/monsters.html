@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Monsters & Items{% endblock title %}
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+{% endblock head %}
+{% block content %}
+    <main class="container-fluid d-flex flex-column justify-content-center align-items-center">
+      {% if added_name is defined and added_name is not none %}
+      <div class="text-success">
+          <small>{{added_name}} added successfully</small>
+      </div>
+      {% endif %}
+      <div class="col-8">
+        <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Monster Name</th>
+                <th scope="col">Size</th>
+                <th scope="col">Type</th>
+                <th scope="col">Motif</th>
+                <th scope="col">Challenge Rating</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody>
+                {% for monster in monsters %}
+                <tr>
+                    <th scope="row">{{monster["id"]}}</th>
+                    <td>{{monster["monster_name"]}}</td>
+                    <td>{{monster["size"]}}</td>
+                    <td>{{monster["monster_type"]}}</td>
+                    <td>{{monster["motif"]}}</td>
+                    <td>{{monster["challenge_rating"]}}</td>
+                    {% if logged is defined and logged %}
+                    <td><a href="/del/monster/{{monster['id']}}" class="text-danger"><i class="bi bi-trash-fill"></i></a></td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if logged is defined and logged %}
+        <form class="col-6 my-5" method="POST" action="/monsters">
+          {{form.hidden_tag()}}
+          <div>
+            {{ form.monster_name.label(class="form-label") }}
+            {{ form.monster_name(class="form-control") }}
+            {% for error in form.monster_name.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+          </div>
+          <div>
+            {{ form.monster_type.label(class="form-label") }}
+            {{ form.monster_type(class="form-control") }}
+            {% for error in form.monster_type.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+          </div>
+          <div>
+            {{ form.monster_size.label(class="form-label") }}
+            {{ form.monster_size(class="form-control") }}
+            {% for error in form.monster_size.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+          </div>
+          <div>
+            {{ form.motif.label(class="form-label") }}
+            {{ form.motif(class="form-control") }}
+            {% for error in form.motif.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+          </div>
+          <div>
+            {{ form.challenge_rating.label(class="form-label") }}
+            {{ form.challenge_rating(class="form-control") }}
+            {% for error in form.challenge_rating.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+          </div>
+           {{ form.submit(class="btn btn-primary mt-3")}}       
+        </form>
+        {% endif %}
+    </main>
+{% endblock content %}

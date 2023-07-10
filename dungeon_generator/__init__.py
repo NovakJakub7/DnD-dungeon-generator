@@ -21,6 +21,9 @@ def create_app():
     from .routes import main_routes
     app.register_blueprint(main_routes)
 
+    from .auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     from .db import init_app
     with app.app_context():
         init_app(app)

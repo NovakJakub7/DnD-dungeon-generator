@@ -6,124 +6,207 @@
 
 {% block content %}
     <main class="container-fluid d-flex vh-100 justify-content-center align-items-center">
-        <form class="col-4" method="POST" action="/generate">
+        <form class="col-4" method="POST" action="/generate" novalidate >
+            {{form.hidden_tag()}}
             <div>
-                <label for="seed" class="form-label">Dungeon Seed</label>
-                <input type="text" class="form-control" name="seed" id="seed" value="">
+                {{ form.seed.label(class="form-label") }}
+                {{ form.seed(class="form-control") }}
+                {% for error in form.seed.errors %}
+                    <div class="text-danger">
+                        <small>{{ error }}</small>
+                    </div>
+                {% endfor %}
             </div>
             <div class="mb-3">
-                <label for="algoType" class="form-label">Type Of Dungeon</label>
-                <select class="form-select" name="algoType" id="selectedAlgo" aria-label="Default select example">
-                    <option selected value="ca">Natural Cavern Complex</option>
-                    <option value="bsp">Ruined/Occupied Structure</option>
-                </select>
+                {{ form.dungeon_type.label(class="form-label") }}
+                {{ form.dungeon_type(class="form-select") }}
+                {% for error in form.dungeon_type.errors %}
+                    <div class="text-danger">
+                        <small>{{ error }}</small>
+                    </div>
+                {% endfor %}
             </div>
             <div id="dungeonSize" class="mb-3">
-                <label for="size" class="form-label">Dungeon Size</label>
-                <select class="form-select" name="size" aria-label="Default select example">
-                    <option selected value="40">Small</option>
-                    <option value="60">Medium</option>
-                    <option value="80">Large</option>
-                    <option value="100">Huge</option>
-                </select>
+                {{ form.dungeon_size.label(class="form-label") }}
+                {{ form.dungeon_size(class="form-select") }}
+                {% for error in form.dungeon_size.errors %}
+                    <div class="text-danger">
+                        <small>{{ error }}</small>
+                    </div>
+                {% endfor %}
             </div>
             <div class="mb-3">
-                <label for="motif" class="form-label">Dungeon Motif</label>
-                <select class="form-select" name="motif" aria-label="Default select example">
-                    <option selected value="Random">Random</option>
-                    <option value="Abandoned">Abandoned</option>
-                    <option value="Vermin">Vermin</option>
-                    <option value="Underdark">Underdark</option>
-                </select>
+                {{ form.dungeon_motif.label(class="form-label") }}
+                {{ form.dungeon_motif(class="form-select") }}
+                {% for error in form.dungeon_motif.errors %}
+                    <div class="text-danger">
+                        <small>{{ error }}</small>
+                    </div>
+                {% endfor %}
             </div>
             <div class="d-flex flex-row justify-content-between mb-3">
                 <div class="me-3 flex-fill">
-                    <label for="numberOfPlayers" class="form-label">Number of Players (1-6)</label>
-                    <input type="number" class="form-control" id="numberOfPlayers" name="numberOfPlayers" placeholder="2" min="1" max="6" required>
+                    {{ form.number_of_players.label(class="form-label") }}
+                    {{ form.number_of_players(class="form-control") }}
+                    {% for error in form.number_of_players.errors %}
+                        <div class="text-danger">
+                            <small>{{ error }}</small>
+                        </div>
+                    {% endfor %}
                 </div>
                 <div class="flex-fill">
-                    <label for="averagePlayerLevel" class="form-label">Average player level (1-20)</label>
-                    <input type="number" class="form-control" id="averagePlayerLevel" name="averagePlayerLevel" placeholder="1" min="1" max="20" required>
+                    {{ form.average_player_level.label(class="form-label") }}
+                    {{ form.average_player_level(class="form-control") }}
+                    {% for error in form.average_player_level.errors %}
+                        <div class="text-danger">
+                            <small>{{ error }}</small>
+                        </div>
+                    {% endfor %}
                 </div>
-            </div> 
+            </div>
             <div id="advancedOptions">
-                <div id="optioncaAlgo" class="d-flex flex-column mb-3">
+                <div id="optionsCA" class="d-flex flex-column mb-3">
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="caRows" class="form-label">Number of Rows</label>
-                            <input type="number" class="form-control dynamic-input-ca" name="caRows" placeholder="50" min="30" max="200">
+                            {{ form.ca_rows.label(class="form-label") }}
+                            {{ form.ca_rows(class="form-control dynamic-input-CA") }}
+                            {% for error in form.ca_rows.errors %}
+                            <div class="text-danger">
+                                <small>{{ error }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         <div class="flex-fill">
-                            <label for="caCols" class="form-label">Number of Columns</label>
-                            <input type="number" class="form-control dynamic-input-ca" name="caCols" placeholder="50" min="30" max="200">
+                            {{ form.ca_columns.label(class="form-label") }}
+                            {{ form.ca_columns(class="form-control dynamic-input-CA") }}
+                            {% for error in form.ca_columns.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="floorProbability" class="form-label">Floor Probability in T = 0 </label>
-                            <input type="number" class="form-control dynamic-input-ca" name="floorProbability" placeholder="0.5" min="0.1" max="0.9" step="any">
+                            {{ form.floor_probability.label(class="form-label") }}
+                            {{ form.floor_probability(class="form-control dynamic-input-CA") }}
+                            {% for error in form.floor_probability.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                         <div class="flex-fill">
-                            <label for="rockThreshold" class="form-label">Rock Threshold</label>
-                            <input type="number" class="form-control dynamic-input-ca" name="rockThreshold" placeholder="5" min="1" max="8">
-                            
+                            {{ form.rock_threshold.label(class="form-label") }}
+                            {{ form.rock_threshold(class="form-control dynamic-input-CA") }}
+                            {% for error in form.rock_threshold.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="numberOfIterations" class="form-label">Number of Cellular Automata Iterations</label>
-                            <input type="number" class="form-control dynamic-input-ca" name="numberOfIterations" placeholder="2" min="2">
+                            {{ form.number_of_iterations.label(class="form-label") }}
+                            {{ form.number_of_iterations(class="form-control dynamic-input-CA") }}
+                            {% for error in form.number_of_iterations.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                         <div class="flex-fill">
-                            <label for="numberOfLevels" class="form-label">Number of Levels</label>
-                            <input type="number" class="form-control dynamic-input-ca" name="numberOfLevels" placeholder="1" min="1" max="20">
+                            {{ form.number_of_levels.label(class="form-label") }}
+                            {{ form.number_of_levels(class="form-control dynamic-input-CA") }}
+                            {% for error in form.number_of_levels.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
-                <div id="optionbspAlgo" class="d-flex flex-column mb-3">
+                <div id="optionsBSP" class="d-flex flex-column mb-3">
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="bspWidth" class="form-label">Number of Rows</label>
-                            <input type="number" class="form-control dynamic-input-bsp" id="bspWidth" name="bspWidth" placeholder="50" min="30" max="200">
+                            {{ form.bsp_rows.label(class="form-label") }}
+                            {{ form.bsp_rows(class="form-control dynamic-input-BSP") }}
+                            {% for error in form.bsp_rows.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                         <div class="flex-fill">
-                            <label for="bspHeight" class="form-label">Number of Columns</label>
-                            <input type="number" class="form-control dynamic-input-bsp" id="bspHeight" name="bspHeight" placeholder="50" min="30" max="200">
+                            {{ form.bsp_cols.label(class="form-label") }}
+                            {{ form.bsp_cols(class="form-control dynamic-input-BSP") }}
+                            {% for error in form.bsp_cols.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill me-3">
-                            <label for="bspMinPartitionWidth" class="form-label">Minimal room width (cells)</label>
-                            <input type="number" class="form-control dynamic-input-bsp" id="bspMinPartitionWidth" name="bspMinPartitionWidth" placeholder="5" min="2" max="100">
+                            {{ form.bsp_min_partition_width.label(class="form-label") }}
+                            {{ form.bsp_min_partition_width(class="form-control dynamic-input-BSP") }}
+                            {% for error in form.bsp_min_partition_width.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                         <div class="flex-fill">
-                            <label for="bspMinPartitionHeight" class="form-label">Minimal room height (cells)</label>
-                            <input type="number" class="form-control dynamic-input-bsp" id="bspMinPartitionHeight" name="bspMinPartitionHeight" placeholder="5" min="2" max="100">
+                            {{ form.bsp_min_partition_height.label(class="form-label") }}
+                            {{ form.bsp_min_partition_height(class="form-control dynamic-input-BSP") }}
+                            {% for error in form.bsp_min_partition_height.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                     <div class="d-flex flex-row">
                         <div class="flex-fill">
-                            <label for="numberOfFloors" class="form-label">Number of Floors</label>
-                            <input type="number" class="form-control dynamic-input-bsp" name="numberOfFloors" placeholder="1" min="1" max="20">
+                            {{ form.number_of_floors.label(class="form-label") }}
+                            {{ form.number_of_floors(class="form-control dynamic-input-BSP") }}
+                            {% for error in form.number_of_floors.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
                 <div class="d-flex flex-row mb-3">
                     <div class="flex-fill me-3">
-                        <label for="maxTreasureValue" class="form-label">Maximal Treasure Value (gp)</label>
-                        <input type="number" class="form-control dynamic-input" id="maxTreasureValue" name="maxTreasureValue" placeholder="100" min="10">
+                        {{ form.max_treasure_value.label(class="form-label") }}
+                            {{ form.max_treasure_value(class="form-control dynamic-input") }}
+                            {% for error in form.max_treasure_value.errors %}
+                            <div class="text-danger">
+                                <small>{{ error }}</small>
+                            </div>
+                            {% endfor %}
                     </div>
                     <div class="flex-fill">
-                        <label for="cellSize" class="form-label">Cell Size</label>
-                        <input type="number" class="form-control dynamic-input" id="cellSize" name="cellSize" placeholder="10" min="10" max="50">
+                        {{ form.cell_size.label(class="form-label") }}
+                            {{ form.cell_size(class="form-control dynamic-input") }}
+                            {% for error in form.cell_size.errors %}
+                                <div class="text-danger">
+                                    <small>{{ error }}</small>
+                                </div>
+                            {% endfor %}
                     </div>
                 </div>
             </div>
+            {{ form.toggled_advanced() }}
+            {{ form.generate_dungeon(class="btn btn-primary") }}
             
-            <input type="hidden" id="toggledAdvanced" name="toggledAdvanced" value="False">
-            <button type="submit" class="btn btn-primary">Generate dungeon</button>
-            <button type="button" class="btn btn-secondary showAdvanced">More options</button>
-                
+            {{ form.more_options(class="btn-check")}}
+            {{ form.more_options.label(class="btn btn-outline-secondary showAdvanced")}}
+            
         </form>
     </main>
    {% endblock content %}
@@ -137,59 +220,66 @@
         };
 
         $(document).ready(function () {
-            $('#advancedOptions').hide();
+            $('.dynamic-input-CA, .dynamic-input-BSP, .dynamic-input').prop('required', false);
+            if($('#toggled_advanced').val() == "False"){
+                $('#advancedOptions').hide();
+            }
+            
             $('.showAdvanced').click(function() {
                 if ($('#advancedOptions').is(':hidden')) {
                     $('#advancedOptions').slideDown();
-                    $('.showAdvanced').html("Less Options")
+                    $('.showAdvanced').html("Show Less Options")
                     $('#dungeonSize').hide()
-                    $('#toggledAdvanced').val("True")
-                    var selectedAlgo = $('#selectedAlgo').val()
-                    $('.dynamic-input-' + selectedAlgo).prop('required', true);
+                    $('#toggled_advanced').val("True")
+                    var dungeon_type = $('#dungeon_type').val()
+                    $('.dynamic-input-' + dungeon_type).prop('required', true);
                     $('.dynamic-input').prop('required', true); 
                 } else {
                     $('#advancedOptions').slideUp();
-                    $('.showAdvanced').html("More Options")
+                    $('.showAdvanced').html("Show More Options")
                     $('#dungeonSize').show()
-                    $('#toggledAdvanced').val("False")
-                    var selectedAlgo = $('#selectedAlgo').val()
-                    $('.dynamic-input-' + selectedAlgo).prop('required', false);
+                    $('#toggled_advanced').val("False")
+                    var dungeon_type = $('#dungeon_type').val()
+                    $('.dynamic-input-' + dungeon_type).prop('required', false);
                     $('.dynamic-input').prop('required', false);
+                    
+                    var inputs = $('#advancedOptions input');
+                    inputs.each(function() {
+                        $(this).val('');
+                        });
                 }
-                
-                
             });
 
-            $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
-            if ($('#selectedAlgo').val() == "ca"){
-                $('#optioncaAlgo').show();
+            $('#optionsCA, #optionsBSP').attr('style','display:none !important');
+            if ($('#dungeon_type').val() == "CA"){
+                $('#optionsCA').show();
             }else{
-                $('#optionbspAlgo').show();
+                $('#optionsBSP').show();
             }    
 
-            $('#selectedAlgo').change(function() {
-                var selectedAlgo = $(this).val();
+            $('#dungeon_type').change(function() {
+                var dungeon_type = $(this).val();
                 // Hide all option input divs
-                $('#optioncaAlgo, #optionbspAlgo').attr('style','display:none !important');
+                $('#optionsCA, #optionsBSP').attr('style','display:none !important');
                 // Show the corresponding option input div based on the selected value
-                $('#option' + selectedAlgo + 'Algo').show();
+                $('#options' + dungeon_type).show();
 
                 if ($('#advancedOptions').is(':visible')) {
-                    $('.dynamic-input-ca, .dynamic-input-bsp').prop('required', false);
-                    $('.dynamic-input-' + selectedAlgo).prop('required', true);
+                    $('.dynamic-input-CA, .dynamic-input-BSP').prop('required', false);
+                    $('.dynamic-input-' + dungeon_type).prop('required', true);
                 }
                
             });
 
-            $('#bspWidth').change(function() {
+            $('#bsp_rows').change(function() {
                 var value = $(this).val();
                 
-                $('#bspMinPartitionWidth').attr('max', Math.round(value / 2))
+                $('#bsp_min_partition_height').attr('max', Math.round(value / 2))
             });
-            $('#bspHeight').change(function() {
+            $('#bsp_cols').change(function() {
                 var value = $(this).val();
                 
-                $('#bspMinPartitionHeight').attr('max', Math.round(value / 2))
+                $('#bsp_min_partition_width').attr('max', Math.round(value / 2))
             });
         });
     </script>

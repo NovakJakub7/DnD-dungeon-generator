@@ -6,25 +6,44 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../static/css/bootstrap.css">
+    <link rel="stylesheet" href="../static/css/lightbox.css">
     <title>{% block title %}{% endblock title %}</title>
+    <style>
+      .img-container{
+        max-width: 800px;
+        width: 100%;
+      }
+    </style>
     {% endblock head %}
 </head>
 
-<body>
-    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+<body class="bg-light">
+    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary bg-light">
         <div class="container-fluid">
-          <a class="navbar-brand" href="#">D&D 3.5 Dungeons</a>
+          <a class="navbar-brand" href="/">D&D 3.5 Dungeons</a>
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
           <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav mb-2 mb-lg-0 ms-auto">
               <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="/">Dungeon Generator</a>
+                <a class="nav-link" aria-current="page" href="/">Dungeon Generator</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="#">Monsters & Items</a>
+                <a class="nav-link" href="/monsters">Monsters</a>
               </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/items">Items</a>
+              </li>
+              {% if logged is defined and logged %}
+                <li class="nav-item">
+                  <a href="/auth/logout" class="nav-link">Logout</a>
+                </li>
+              {% else %}
+                <li class="nav-item">
+                  <a href="/auth/login" class="nav-link">Login</a>
+                </li>
+              {% endif %}
             </ul>
           </div>
         </div>
@@ -32,10 +51,17 @@
     <div id="content">{% block content %}{% endblock content %}</div>
     <div id="footer">
         {% block footer %}
+        <footer class="text-center text-lg-start">
+          <div class="text-center text-white p-3 bg-secondary">
+            © 2023 Copyright:
+            <a class="text-white" href="/">Jakub Novák</a>
+          </div>
+        </footer>
         {% endblock footer %}
     </div>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
     <script src="../static/js/bootstrap.js"></script>
+    <script src="../static/js/lightbox.js"></script>
     {% block scripts %}
     {% endblock scripts %}
 </body>

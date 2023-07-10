@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock title %}
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+{% block content %}
+<main class="container-fluid d-flex vh-100 justify-content-center align-items-center">
+    <form method="POST" action="/auth/login">
+        {{form.hidden_tag()}}
+        <div>
+            {{ form.username.label(class="form-label") }}
+            {{ form.username(class="form-control") }}
+            {% for error in form.username.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+        </div>
+        <div>
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control") }}
+            {% for error in form.password.errors %}
+                <div class="text-danger">
+                    <small>{{ error }}</small>
+                </div>
+            {% endfor %}
+        </div>
+        {{ form.submit(class="btn btn-primary mt-3") }}
+        
+    </form>
+</main>
+
+{% endblock content %}

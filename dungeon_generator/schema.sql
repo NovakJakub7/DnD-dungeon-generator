@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS monsters;
 DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS users;
 
 CREATE TABLE monsters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,6 +17,12 @@ CREATE TABLE items (
   item_type TEXT NOT NULL,
   weight TEXT DEFAULT '0',
   price INTEGER NOT NULL
+) ;
+
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
 ) ;
 
 INSERT INTO monsters(monster_name, size, monster_type, motif, challenge_rating) VALUES

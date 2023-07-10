@@ -1,6 +1,8 @@
 import sqlite3
 import os
 import click
+import shutil
+from werkzeug.security import generate_password_hash
 from flask import current_app, g
 
 
@@ -26,7 +28,42 @@ def init_db():
         db.executescript(f.read().decode('utf8'))
 
 
+def db_backup():
+    db_path = os.path.join(current_app.instance_path, 'database.sqlite')
+    backup_path = os.path.join(current_app.instance_path, 'database_backup.sqlite')
+    # Create backup
+    shutil.copyfile(db_path, backup_path)
+    click.echo("Database backup created.")
+
+
 def init_app(app):
     app.teardown_appcontext(close_db)
-    init_db()
-    click.echo('Initialized the database.')
+    db_path = os.path.join(app.instance_path, 'database.sqlite')
+    backup_path = os.path.join(app.instance_path, 'database_backup.sqlite')
+
+    # Check if backup file exists
+    if os.path.exists(backup_path):
+        # Restore from backup
+        shutil.copyfile(backup_path, db_path)
+        click.echo("Database restored from backup.")
+    else:
+        init_db()
+        click.echo('Initialized the database.')
+        
+        db = get_db()
+        cur = db.cursor()
+        username = "admin"
+        password = "admin"
+        cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, generate_password_hash(password)))
+        db.commit()
+        click.echo("Admin user created.")
+        cur.close()
+        db.close()
+
+        # Create backup
+        shutil.copyfile(db_path, backup_path)
+        click.echo("Database backup created.")
+
+    click.echo("App initialized")
+    
+    

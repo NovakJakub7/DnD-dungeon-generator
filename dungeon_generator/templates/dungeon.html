@@ -6,12 +6,16 @@
 
 {% block content %}
     <main class="container-fluid d-flex flex-column justify-content-center align-items-center">
-        <ul class="list-group list-group-flush">
+        <ul class="list-group list-group-flush col-6">
             {% for level in map_description %}
-            <li class="list-group-item">
+            <li class="list-group-item bg-light">
                 <h3>Level {{level['level_id'] + 1}}</h3>
-                <img src="../static/svg/{{level['svg_name']}}" class="img-fluid" alt="Dungeon map - {{level['level_id']}}">
-                <div class="d-flex flex-row justify-content-between mt-3 align-items-center">
+                <div class="img-container d-flex justify-content-center col-md-8">
+                    <a href="../static/svg/{{level['svg_name']}}" data-lightbox="dungeon" data-title="Dungeon - {{level['level_id']}}">
+                        <img src="../static/svg/{{level['svg_name']}}" class="img-fluid" alt="Dungeon map - {{level['level_id']}}">
+                    </a>     
+                </div>
+                <div class="d-flex flex-row justify-content-evenly mt-3 align-items-center">
                     <div class="d-flex flex-row align-items-center">
                         <svg width="20" height="20">
                             <rect width="20" height="20" style="fill: blue;">
@@ -43,33 +47,33 @@
                         <tr>
                             <th scope="row">Cave: {{cave['cave_id'] + 1}}</th>
                             <td>
-                                <table class="table">
+                                <table class="table table-borderless">
                                     
                                     {% if cave['monster_desc']|length > 0 %}
                                     <tr>
-                                        <th scope="row">Monsters:</th>
-                                        <td>{{cave['monster_desc']['number_of_monsters']}}× {{cave['monster_desc']['monster']['monster_name']}}, {{cave['monster_desc']['monster']['size']}}, {{cave['monster_desc']['monster']['monster_type']}}, CR: {{cave['monster_desc']['monster']['challenge_rating']}}</td>
+                                        <th scope="row" class="pt-0 pb-3">Monsters:</th>
+                                        <td class="pt-0 pb-3">{{cave['monster_desc']['number_of_monsters']}}× {{cave['monster_desc']['monster']['monster_name']}}, {{cave['monster_desc']['monster']['size']}}, {{cave['monster_desc']['monster']['monster_type']}}, CR: {{cave['monster_desc']['monster']['challenge_rating']}}</td>
                                     </tr>
                                     {% endif %}
                                     {% if cave['treasure']|length > 0 %}
                                     <tr>
-                                        <th scope="row">Treasure:</th>
+                                        <th scope="row" class="pt-0 pb-3">Treasure:</th>
                                         {% if cave['treasure']['item'] is not none%}
-                                            <td>{{cave['treasure']['item']['item_name']}}, {{cave['treasure']['item']['item_type']}}, {{cave['treasure']['item']['weight']}}, {{cave['treasure']['item']['price']}} gp</td>
+                                            <td class="pt-0 pb-3">{{cave['treasure']['item']['item_name']}}, {{cave['treasure']['item']['item_type']}}, {{cave['treasure']['item']['weight']}}, {{cave['treasure']['item']['price']}} gp</td>
                                         {% endif %}
                                         {% if cave['treasure']['gp'] > 0 %}
-                                            <td>{{cave['treasure']['gp']}} gp</td>
+                                            <td class="pt-0 pb-3">{{cave['treasure']['gp']}} gp</td>
                                         {% endif %}
                                     </tr>
                                     {% endif %}
                                     {% if not cave['monster_desc']|length > 0 and not cave['treasure']|length > 0 %}
                                         {% if 'ca' in level['svg_name']%}
                                         <tr>
-                                            <td>The cave seems to be empty.</td>
+                                            <td class="pt-0 pb-3">The cave seems to be empty.</td>
                                         </tr>
                                         {% else %}
                                         <tr>
-                                            <td>The room looks empty.</td>
+                                            <td class="pt-0 pb-3">The room looks empty.</td>
                                         </tr>
                                         {% endif %}
                                     {% endif %}
@@ -81,7 +85,7 @@
 
             </li>
             {% endfor %}
-            <li class="list-group-item"><a class="btn btn-primary" href="/" role="button">Back to settings</a></li>
+            <li class="list-group-item bg-light"><a class="btn btn-primary" href="/" role="button">Back to settings</a></li>
         </ul>   
         
         
