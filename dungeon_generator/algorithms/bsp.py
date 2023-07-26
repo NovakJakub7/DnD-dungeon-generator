@@ -1,6 +1,6 @@
 import random
 import svgwrite
-import os
+import pathlib
 import math
 from svgwrite import pattern
 from .desc_generator import DescriptionGenerator
@@ -8,10 +8,6 @@ from .desc_generator import DescriptionGenerator
 DISCARD_BY_RATIO = True
 H_RATIO = 0.45
 W_RATIO = 0.45
-
-# TODO:
-#   start, exit, patra
-#   vkládání nepřátel, kořisti
 
 class BSPDungeon:
     def __init__(self, bounds, seed, motif: str, cell_size: int,  average_player_level: int, number_of_players: int, max_treasure_value: int, save_path: str, db_conn = None, number_of_floors: int = 1) -> None:
@@ -28,6 +24,7 @@ class BSPDungeon:
 
 
     def generate_dungeon(self, min_partition_width, min_partition_height):
+        """Function generates one or more dungeons with descriptions and saves them as SVG images."""
         floors = []
         dungeon_description = []
 
@@ -38,7 +35,6 @@ class BSPDungeon:
             else:
                 bsp_tree = BSPTree(self.bounds, self.seed, self.cell_size, upper_floor=None, floor_depth=i + 1, number_of_floors=self.number_of_floors)
             floors.append(bsp_tree.create_map(min_partition_width, min_partition_height))
-            #place monsters TO DO
             desc = bsp_tree.place_monsters_items(self.db_conn, self.average_player_level, self.number_of_players, self.max_treasure_value, self.motif)
             bsp_tree.make_svg(self.save_path, file_name)
 
@@ -54,7 +50,7 @@ class BSPTree:
         self.root = BSPNode(bounds)
         self.min_partition_width = 0
         self.min_partition_height = 0
-        self.upper_floor = upper_floor #instance BSPTree reprezentujici vrchnejsi level, None kdyz není
+        self.upper_floor = upper_floor
         self.entry = None
         self.entry_direction = ""
         self.exit = None
@@ -69,6 +65,7 @@ class BSPTree:
         
 
     def create_map(self, min_partition_width, min_partition_height) -> None:
+        """Function creates a representation of a dungeon map."""
 
         self.min_partition_width = min_partition_width
         self.min_partition_height = min_partition_height
@@ -86,6 +83,7 @@ class BSPTree:
 
     def partition(self, min_width, min_height, cell_size) -> None:
         """Apply space partitioning on root node."""
+
         self.root.partition(min_width, min_height, cell_size)
         
 
@@ -122,29 +120,25 @@ class BSPTree:
         corridors = root.get_corridors()
 
         return corridors
+    
 
     def place_entry_exit(self) -> None:
-        # POKRAČUJEME ZDE
-        # mám souřadnice vstupu podle strany
-        print("Depth:", self.floor_depth)
+        """Place entry and exit points into the map."""
         rooms = self.get_rooms()   
         directions = ["left", "right", "top", "bottom"]
         entry_direction = ""
         self.entry_size = math.ceil(self.min_partition_width / 100 * 25)
-       
-        # nemam vrchní patro, udelam random vstup na nejaké straně
+
+        # ENTRY
+        # no upper floor, make random entry based on direction
         if self.upper_floor is None:
-            # START
             entry_direction = random.choice(directions)
-            #entry_direction = "left"
             entry_room, entry_point  = self.make_random_door(rooms, entry_direction)
             print("Entry direction:", entry_direction, "Entry point:", entry_point)
             self.entry_direction = entry_direction
             self.entry = entry_point         
-        else: # mam vrchní patro, udělam vstup (schodiste) z exitu predchoziho patra (patro nahore nebo dole?)
-            # mel by byt rectangle schodiste
-            upper_floor_exit = self.upper_floor.exit
-            print("Upper floor:", upper_floor_exit)           
+        else: # make entry (staircase) based on upper floor exit
+            upper_floor_exit = self.upper_floor.exit           
             entry_room = self.find_closest_room(upper_floor_exit, rooms)
             staircase, entry_direction = self.make_staircase(entry_room)
             self.entry_direction = entry_direction
@@ -153,23 +147,22 @@ class BSPTree:
         #EXIT
         possible_exit_rooms = rooms
         possible_exit_rooms.remove(entry_room)
-        # pokud je jen jedno patro nebo jsem poslední patro tak exit v random roomce
+        # if there is just one floor or there are no more floors make exit in random room
         if self.number_of_floors == 0 or self.floor_depth == self.number_of_floors:
-            # vybereme ze smeru, kde neni stejny smer jako entry
+            # choose direction that is not the entry direction
             exit_directions = directions
             if entry_direction != "":
                 exit_directions.remove(entry_direction)
             exit_direction = random.choice(exit_directions)
-            exit_room, exit_point = self.make_random_door(possible_exit_rooms, exit_direction)
-            print("Exit direction:", exit_direction, "Exit point:", exit_point)    
+            exit_room, exit_point = self.make_random_door(possible_exit_rooms, exit_direction)  
             self.exit_direction = exit_direction
             self.exit = exit_point     
-        else:
+        else: # otherwise make exit staircase in random room
             exit_room = random.choice(possible_exit_rooms) 
             staircase, exit_direction = self.make_staircase(exit_room)
-            print("Exit staircase direction", exit_direction)
             self.exit_direction = exit_direction
             self.exit = staircase
+
 
     def place_monsters_items(self, db_conn, average_player_level, number_of_players, max_treasure_value, motif):
         """Function creates dictionary describing item and monster placement inside the dungeon."""
@@ -179,10 +172,12 @@ class BSPTree:
             for motive in motives:
                 available_motives.append(motive['motif'])
             motif = random.choice(available_motives)
+
         encounter_level = math.floor(average_player_level * number_of_players / 4)
         if encounter_level == 0:
             encounter_level = 1
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
+        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value)
+
         rooms = self.get_rooms()
         room_sizes = []
         number_of_rooms = len(rooms)
@@ -196,7 +191,8 @@ class BSPTree:
         for room in rooms:
             room_sizes.append(room.width * room.height)
         room_sizes.sort(reverse=True)
-        #print(room_sizes)
+        
+        # decide large and small rooms
         if number_of_rooms < 10:
             large_rooms_index = 1
             small_rooms_index = number_of_rooms - 2
@@ -210,27 +206,29 @@ class BSPTree:
         large_size = room_sizes[large_rooms_index]
         small_size = room_sizes[small_rooms_index] 
         
+        # make descriptions based on room size
         for room in rooms:
             room_size = room.width * room.height
-            if room_size >= large_size: # velke
+            if room_size >= large_size: # large rooms, large monsters and treasure
                 if larger_monsters:
                     monster_description = desc_generator.generate_monster_description(larger_monsters)
                 else:
                     monster_description = desc_generator.generate_monster_description(smaller_monsters)
                 treasure_description = desc_generator.generate_treasure_description(items)
                 dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': treasure_description})    
-            elif room_size < large_size and room_size > small_size: # medium
+            elif room_size < large_size and room_size > small_size: # medium rooms, small monsters
                 monster_description = {}
                 if random.random() < .4:
                     if smaller_monsters:
                         monster_description = desc_generator.generate_monster_description(smaller_monsters)
                 dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': monster_description, 'treasure': {}})
-            else: # male
+            else: # small rooms, treasure
                 treasure_description = desc_generator.generate_treasure_description(items)
                 dungeon_description.append({'cave_id': rooms.index(room), 'monster_desc': {}, 'treasure': treasure_description})
 
         dungeon_description = sorted(dungeon_description, key=lambda x: x['cave_id'])
 
+        # add rest of treasure to random room
         if desc_generator.rest_of_value > 0:
             random_desc = random.choice(dungeon_description)
             while not random_desc["treasure"]:
@@ -241,6 +239,7 @@ class BSPTree:
 
 
     def query_db(self, db_conn, query, args=(), one=False):
+        """Query databse and return the result."""
         cur = db_conn.cursor().execute(query, args)
         rv = cur.fetchall()
         cur.close()
@@ -248,6 +247,7 @@ class BSPTree:
 
 
     def is_room_inside(self, outer_rect, inner_rect):
+        """Return True if room is inside another room, otherwise return False."""
         if (
             outer_rect.left <= inner_rect.left and
             outer_rect.top <= inner_rect.top and
@@ -260,6 +260,7 @@ class BSPTree:
 
 
     def find_closest_room(self, target_room, rooms):
+        """Return the closest room to another room."""
         closest_room = None
         closest_distance = float('inf')
         target_room_center_x, target_room_center_y = target_room.center()
@@ -275,6 +276,7 @@ class BSPTree:
 
 
     def make_staircase(self, room):
+        """Function creates a staircase in room."""
         direction = random.choice(["left", "right", "top", "bottom"])
         staircase = Rectangle(0,0,0,0)
         staircase_width = self.cell_size * 2
@@ -302,14 +304,15 @@ class BSPTree:
 
         corridors = self.get_corridors()
 
-        if self.is_corridor_through_room(corridors, staircase):
+        if self.is_corridor_through_rect(corridors, staircase):
             print("CORRIDOR IS THROUGH")
             return self.make_staircase(room)
         else:
             return (staircase, direction)
     
 
-    def is_corridor_through_room(self, corridors, room):
+    def is_corridor_through_rect(self, corridors, room):
+        """Return True if corridor passes through rectangle, otherwise false."""
         for rect in corridors:
             if (
                 rect.right > room.left and        # Right edge of rect is to the right of room's left edge
@@ -322,6 +325,7 @@ class BSPTree:
 
 
     def make_random_door(self, rooms, direction):
+        """Function creates door in given direction and returns the door room and door as tuple."""
         door_point = ()
         if direction == "left":
             door_room = min(rooms, key=lambda x: x.left)
@@ -338,8 +342,8 @@ class BSPTree:
         return (door_room, door_point)
 
     def make_svg(self, save_path, file_name):
-        """Generate svg image from BSPTree and save it to path under the file name."""
-        file_path = os.path.join(save_path, file_name)
+        """Function generates SVG image from BSPTree and saves it to path under the file name."""
+        file_path = save_path.joinpath(file_name)
 
         self.svg_name = file_name
 
@@ -369,9 +373,10 @@ class BSPTree:
         dwg.save()
 
 
-    def draw_misc(self, dwg):  
+    def draw_misc(self, dwg): 
+        """Function draws entry points, exit points and staircase.""" 
+        # ENTRY
         if self.entry is not None:
-            print("SVG entry:", self.entry)
             if isinstance(self.entry, Rectangle):
                 staircase_group = dwg.g()
                 stripe_count = 8
@@ -394,17 +399,15 @@ class BSPTree:
             else:
                 entry_x, entry_y = self.entry
                 if self.entry_direction == "left": 
-                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size), fill="white", stroke="blue"))  
-                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size / 3, self.cell_size), fill="brown", stroke="black"))
+                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size), fill="blue"))
                 elif self.entry_direction == "right":
-                    dwg.add(dwg.rect((entry_x - self.cell_size / 3, entry_y), (self.cell_size / 3, self.cell_size), fill="brown", stroke="black"))
+                    dwg.add(dwg.rect((entry_x - self.cell_size, entry_y), (self.cell_size, self.cell_size), fill="blue"))
                 elif self.entry_direction == "top":
-                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size / 3), fill="brown", stroke="black"))
+                    dwg.add(dwg.rect((entry_x, entry_y), (self.cell_size, self.cell_size), fill="blue"))
                 else:
-                    dwg.add(dwg.rect((entry_x, entry_y - self.cell_size / 3), (self.cell_size, self.cell_size / 3), fill="brown", stroke="black"))
-
+                    dwg.add(dwg.rect((entry_x, entry_y - self.cell_size), (self.cell_size, self.cell_size), fill="blue"))
+        # EXIT
         if self.exit is not None:
-            print("SVG exit:", self.exit)
             if isinstance(self.exit, Rectangle):
                 staircase_group = dwg.g()
                 stripe_count = 8
@@ -447,7 +450,6 @@ class BSPTree:
 
 class BSPNode:
     def __init__(self, bounds) -> None:
-        #self.parent = BSPNode()
         self.left_child = None
         self.right_child = None
         self.bounds = bounds
@@ -488,11 +490,10 @@ class BSPNode:
 
 
     def create_room(self, min_width, min_height, cell_size):
-        """Places a room within nodes boundaries."""
+        """Function places a room within nodes boundaries."""
        
         room_width = random.randrange(min_width, self.bounds.width - cell_size * 2 + 1, cell_size) 
         room_height = random.randrange(min_height, self.bounds.height - cell_size * 2 + 1, cell_size)
-        #print(self.bounds.right - room_width - cell_size + 1)
         room_left = random.randrange((math.ceil(self.bounds.left / cell_size) * cell_size) + cell_size, self.bounds.right - room_width - cell_size + 1, cell_size)
         room_top = random.randrange((math.ceil(self.bounds.top / cell_size) * cell_size) + cell_size, self.bounds.bottom - room_height - cell_size + 1, cell_size)
 
@@ -500,6 +501,7 @@ class BSPNode:
      
 
     def get_room(self):
+        """Return the closest room in the tree structure."""
         if self.left_child is None and self.right_child is None:
             return self.room
         if self.left_child is not None:
@@ -517,11 +519,9 @@ class BSPNode:
 
 
     def create_sibling_corridor(self, left_child, right_child, corridor_size):
+        """Function creates corridor for two sibling nodes."""
         room_1 = left_child.get_room()
         room_2 = right_child.get_room()
-
-        #point_1 = (random.randint(room_1.left + corridor_size, room_1.right - corridor_size), random.randint(room_1.top + corridor_size, room_1.bottom - corridor_size))
-        #point_2 = (random.randint(room_2.left + corridor_size, room_2.right - corridor_size), random.randint(room_2.top + corridor_size, room_2.bottom - corridor_size))
 
         point_1 = room_1.center_rounded(corridor_size)
         point_2 = room_2.center_rounded(corridor_size)
@@ -575,6 +575,7 @@ class BSPNode:
 
 
     def draw_rooms(self, svg_document, cell_size):
+        """Function draws rooms."""
         floor_index = 0
         room_numbers = []
         for node in self.get_leaf_nodes():
@@ -585,10 +586,10 @@ class BSPNode:
             group = svg_document.add(svg_document.g())
             group.add(svg_document.rect((node.room.left, node.room.top), (node.room.width, node.room.height), fill=pattern.get_paint_server(), stroke="black",  stroke_width=1))
             room_numbers.append({"id": str(floor_index + 1), "insert_x": (node.room.left + node.room.right)/2, "insert_y": (node.room.bottom + node.room.top)/2})
-            #group.add(svg_document.rect((node.bounds.left, node.bounds.top), (node.bounds.width, node.bounds.height), stroke="green"))
         return room_numbers    
 
     def create_corridors(self, corridor_size):
+        """Function iterates over the tree and creates corridors for sibling nodes."""
         if self.left_child is None and self.right_child is None:
             return
 
@@ -599,6 +600,7 @@ class BSPNode:
 
 
     def draw_corridors(self, svg_document, cell_size):
+        """Function draws corridors"""
         if self.left_child is None and self.right_child is None:
             return
         pattern = svg_document.defs.add(
@@ -608,13 +610,12 @@ class BSPNode:
             for corridor in self.corridors:
                 group = svg_document.add(svg_document.g())
                 map_corridor = group.add(svg_document.rect((corridor.left, corridor.top), (corridor.width, corridor.height), fill=pattern.get_paint_server()))   
-                #corridor_id = group.add(svg_document.text(id(self), insert=(corridor.left + 2, corridor.top - 2)))
-                #corridor_id.fill('white')
 
         self.left_child.draw_corridors(svg_document, cell_size)
         self.right_child.draw_corridors(svg_document, cell_size)
 
     def get_corridors(self):
+        """Return all corridors of the map."""
         corridors = []
         if self is None:
             return []
@@ -641,48 +642,14 @@ class Rectangle:
         self.bottom = top + height
 
     def center(self) -> tuple:
+        """Return the center of the rectangle"""
         center_x = (self.left + self.right)/2
         center_y = (self.top + self.bottom)/2
         return (center_x, center_y)
 
 
     def center_rounded(self, rounded_to_multiple) -> tuple:
+        """Return a rounder center of the rectangle"""
         center_x = round(((self.left + self.right)/2) / rounded_to_multiple) * rounded_to_multiple
         center_y = round(((self.top + self.bottom)/2) / rounded_to_multiple) * rounded_to_multiple
         return (center_x, center_y)
-
-if __name__ == "__main__":
-    
-    #bsp = BSPTree(Rectangle(0, 0, 800, 800), 545, 10)
-    #bsp.create_map(150, 150)
-    #bsp.make_svg(save_path=r"C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\static\svg", file_name=r"map_bsp.svg")
-    
-
-    # Create a new SVG document
-    dwg = svgwrite.Drawing('staircase_exit.svg')
-
-    # Define the pattern properties
-    pattern_width = 40
-    pattern_height = 40
-    stripe_count = 8
-    stripe_width = pattern_width / stripe_count
-    # Create a group element for the pattern
-    pattern_group = dwg.g()
-    
-    # Create the stripes of the pattern
-    for i in range(stripe_count):
-        x = i * stripe_width
-        y = 0 + i
-        width = stripe_width
-        height = pattern_height - i * 2
-                   
-        stripe = dwg.rect(insert=(x, y), size=(width, height), fill='white', stroke='black')
-        pattern_group.add(stripe)
-
-    #dwg.add(dwg.rect(insert=(0,0), size=(pattern_width, pattern_height), fill="white", stroke="blue"))
-    # Add the pattern group to the SVG document
-    dwg.add(pattern_group)
-
-    # Save the SVG document
-    dwg.save()
-

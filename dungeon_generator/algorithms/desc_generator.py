@@ -46,11 +46,10 @@ TREASURE: list = [{"number_of_dice": 2, "dice_size": 8, "treasure_base": 10},
 
 
 class DescriptionGenerator:
-    def __init__(self, encounter_level: int, max_treasure_value: int, motif: str) -> None: 
+    def __init__(self, encounter_level: int, max_treasure_value: int) -> None: 
         self.encounter_level = encounter_level
         self.max_treasure_value = max_treasure_value
         self.rest_of_value = max_treasure_value
-        self.motif = motif
 
     def generate_monster_description(self, monsters: list) -> dict:
         monster = random.choice(monsters)

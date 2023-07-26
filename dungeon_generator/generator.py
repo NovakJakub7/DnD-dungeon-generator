@@ -1,6 +1,6 @@
 import dungeon_generator.algorithms.ca as ca
 import dungeon_generator.algorithms.bsp as bsp
-import os
+import pathlib
 
 def generate_map(selected_options, db_conn):
     """Generuje DnD mapu v SVG formátu dle zadaných parametrů z formuláře."""
@@ -8,7 +8,8 @@ def generate_map(selected_options, db_conn):
     # TODO: 
     #   vytvořit různé velikosti map k použití na webu/downloadu
 
-    save_path = r"C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\static\svg"
+    package_path = pathlib.Path.cwd()
+    save_path = package_path.joinpath("dungeon_generator", "static","svg")
 
     seed = int(selected_options["seed"])
     dungeon_type = selected_options["dungeon_type"]
@@ -38,6 +39,7 @@ def generate_map(selected_options, db_conn):
             rock_threshold = ca.T
             number_of_levels = 1
         
+        print(number_of_levels)
         d = ca.CADungeon(save_path, cell_size, dungeon_motif, average_player_level, number_of_players, max_treasure_value, db_conn, number_of_levels)
         dungeon_description = d.generate_dungeon(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold)
     else:

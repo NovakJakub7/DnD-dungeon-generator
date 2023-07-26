@@ -1,11 +1,15 @@
 import numpy as np
 import svgwrite
 import queue
-import os
+import pathlib
 import math
 import copy
 from scipy.spatial import KDTree
 from numbers import Number
+from svglib.svglib import svg2rlg
+from reportlab.lib.pagesizes import landscape
+from reportlab.pdfgen import canvas
+from reportlab.graphics import renderPDF
 from .desc_generator import DescriptionGenerator
 
 
@@ -23,7 +27,7 @@ F: Number = .5 # pravděpodobnost že bude bunka v čase t=0 volná
 #   vkládání nepřátel, kořisti
 
 class CADungeon:
-    def __init__(self, save_path: str, cell_size: int, motif: str, average_player_level: int, number_of_players: int, max_treasure_value: int, db_conn = None, number_of_floors: int = 1) -> None:
+    def __init__(self, save_path, cell_size: int, motif: str, average_player_level: int, number_of_players: int, max_treasure_value: int, db_conn = None, number_of_floors: int = 1) -> None:
         self.db_conn = db_conn
         self.average_player_level = average_player_level
         self.number_of_players = number_of_players
@@ -33,34 +37,72 @@ class CADungeon:
         self.save_path = save_path
         self.number_of_floors = number_of_floors
 
-    def generate_dungeon(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T, wanted_caves: int = 0) -> list:
+    def generate_dungeon(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T) -> list:
         caves = []
         dungeon_description = []
 
+        package_path = pathlib.Path.cwd()
+        pdf_dir = package_path.joinpath("dungeon_generator", "static","images")
+
         for i in range(0, self.number_of_floors):
             file_name = "map_ca_{}.svg".format(i)
+            pdf_file_name = "map_ca_{}.pdf".format(i)
             if i > 0:
-                ca_cave = CACave(rows, cols, seed + i, floor_probability, number_of_iterations, rock_threshold, wanted_caves, upper_cave=caves[i - 1])
+                ca_cave = CACave(rows, cols, seed + i, floor_probability, number_of_iterations, rock_threshold, upper_cave=caves[i - 1])
             else:
-                ca_cave = CACave(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold, wanted_caves)
+                ca_cave = CACave(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold)
             caves.append(ca_cave.generate_map())
             desc = ca_cave.place_monsters_items(self.db_conn, self.dungeon_motif, self.average_player_level, self.number_of_players, self.max_treasure_value)
-            ca_cave.make_svg_from_map(self.svg_cell_size, save_path=self.save_path, file_name=file_name)    
+            ca_cave.make_svg(self.svg_cell_size, save_path=self.save_path, file_name=file_name)
+
+            self.convert_svg_to_pdf(self.save_path.joinpath(file_name), pdf_dir.joinpath(pdf_file_name), self.svg_cell_size * cols, self.svg_cell_size * rows)    
             
             level_description = {'level_id': i, 'desc_list': desc, 'svg_name': ca_cave.svg_name}
             dungeon_description.append(level_description)
 
         return dungeon_description
 
+
+    def convert_svg_to_pdf(self, input_svg, output_pdf, width, height):
+        #drawing = svg2rlg(input_svg)
+        #renderPDF.drawToFile(drawing, str(output_pdf), autoSize=0)
+        # Create a new PDF canvas
+        size = (width + 200, height + 200)
+        c = canvas.Canvas(str(output_pdf), pagesize=landscape(size))
+
+        # Load the SVG image using svglib
+        drawing = svg2rlg(input_svg)
+
+         # Set the position and scale of the SVG image on the canvas
+        image_width = drawing.width
+        image_height = drawing.height
+        x = (size[0] - image_width) / 2
+        y = size[1] - image_height
+
+        # Draw the SVG image on the canvas
+        renderPDF.draw(drawing, c, x, y)
+
+        text = "Toto je text."
+
+        # Set the position for the text below the image
+        text_x = x + (image_width - c.stringWidth(text)) / 2
+        text_y = y - 20  # Adjust the distance below the image as needed
+
+        # Add the text to the canvas
+        c.drawString(text_x, text_y, text)
+
+        # Save the canvas to the PDF file
+        c.save()
+
+
 class CACave:
-    def __init__(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T, wanted_caves: int = 0, upper_cave = None) -> None:
+    def __init__(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T, upper_cave = None) -> None:
         self.rows = rows
         self.cols = cols
         self.map = []
         self.floor_probability = floor_probability
         self.number_of_iterations = number_of_iterations
         self.rock_threshold = rock_threshold
-        self.wanted_caves = wanted_caves # 0 means not bounded
         self.caves = []
         self.upper_cave = upper_cave # Upper floor cave, only one floor cave if None
         self.start_cell = ()
@@ -87,7 +129,7 @@ class CACave:
         return self
 
 
-    def make_svg_from_map(self, cell_size, save_path, file_name) -> None:
+    def make_svg(self, cell_size, save_path, file_name) -> None:
         """ Makes svg image from map and saves it to path.
         """
         # Define the size of each cell in the map
@@ -96,7 +138,7 @@ class CACave:
         self.svg_name = file_name
 
         # Combine the path and filename to create the full file path
-        file_path = os.path.join(save_path, file_name)
+        file_path = save_path.joinpath(file_name)
 
         canvas_width = '{}px'.format(CELL_SIZE * self.cols)
         canvas_height = '{}px'.format(CELL_SIZE * self.rows)
@@ -107,21 +149,25 @@ class CACave:
         for x, row in enumerate(self.map):
             for y, cell in enumerate(row):
                 if cell == FLOOR:
-                    group = dwg.add(dwg.g())
-                    group.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='black', stroke_width=1))
-                    for cave in self.caves:
-                        if (x, y) in cave.cells and (x == cave.id_cell_x and y == cave.id_cell_y):
-                            cave_index = self.caves.index(cave)
-                            cave_id = group.add(dwg.text(str(cave_index + 1), insert=(y * CELL_SIZE + CELL_SIZE / 2, x * CELL_SIZE + CELL_SIZE / 2), text_anchor='middle', alignment_baseline="middle", font_size=CELL_SIZE, fill='black'))
-                            #print(cave_index)
-                   #dwg.add(dwg.rect((x*CELL_SIZE, y*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='black', stroke_width=1))
+                    #group = dwg.add(dwg.g())
+                    #group.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
+                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
                 elif cell == START:
                     dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='blue'))
                 elif cell == EXIT:
                     dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='red'))
                 else:
                     dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='black', stroke="black"))
-        #dwg.viewbox(0, 0, CELL_SIZE * self.cols, CELL_SIZE * self.rows)
+
+        for cave in self.caves:
+            x, y = cave.find_id_cell()
+
+            group = dwg.add(dwg.g())
+            group.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
+
+            cave_index = self.caves.index(cave)
+            group.add(dwg.text(str(cave_index + 1), insert=(y * CELL_SIZE + CELL_SIZE / 2, x * CELL_SIZE + CELL_SIZE / 2), text_anchor='middle', alignment_baseline="middle", font_size=CELL_SIZE * 2, fill='black'))
+    
         dwg.save()
 
     def generate_grid(self):
@@ -218,20 +264,7 @@ class CACave:
                 self.caves.append(Cave(floor_region))      
 
         self.caves.sort(reverse=True, key=Cave.get_cave_size)
-        """
-        if not self.wanted_caves == 0:
-            # not enough caves, try to make a new map
-            if self.wanted_caves > len(self.caves):
-                return self.generate_map()
-            else:
-                caves_to_delete = len(self.caves) - self.wanted_caves
-                for _ in range(0, caves_to_delete):
-                    index_to_delete = RNG.randint(1, len(self.caves) - 1) # we let the biggest cave in
-                    for cell in self.caves[index_to_delete].cells:
-                        x, y = cell
-                        self.map[x][y] = ROCK
-                    self.caves.pop(index_to_delete)
-        """
+        
         if self.caves:
             self.caves[0].main_cave = True 
             self.caves[0].accessible_from_main_cave = True
@@ -493,7 +526,7 @@ class CACave:
         encounter_level = math.floor(average_level * number_of_players / 4)
         if encounter_level == 0:
             encounter_level = 1
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value, motif)
+        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value)
         smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
         larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
         smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level, motif])
@@ -586,9 +619,29 @@ class Cave:
         """Checks if other cave is connected."""
 
         return other_cave in self.connected_caves
+    
+    
+    def find_id_cell(self):
+        x = 0
+        y = 0
+        for cell in self.cells:
+            x,y = cell
+            is_suitable = True
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    neighbour_x = x + dx
+                    neighbour_y = y + dy
+                    if (neighbour_x, neighbour_y) not in self.cells:
+                        is_suitable = False
+                if not is_suitable:
+                    break
+            if is_suitable:
+                break
 
+        return (x, y)
 
 if __name__ == "__main__":
    
     d = CADungeon(r"C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\static\svg", 10, None, 1)
     caves = d.generate_dungeon(55, 55, 9509, 0.3, 3, 5)
+    
