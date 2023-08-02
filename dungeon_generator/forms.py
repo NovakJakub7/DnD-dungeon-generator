@@ -1,7 +1,9 @@
+import math
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, IntegerField, HiddenField, BooleanField, FloatField, PasswordField
 from wtforms.validators import InputRequired, Length, NumberRange, ValidationError, Optional
-
+from .db import get_db
+from .algorithms.desc_generator import ENCOUNTER_NUMBERS, calculate_party_level
 
 class DungeonForm(FlaskForm):
     seed = IntegerField("Dungeon Seed", validators=[InputRequired()])
@@ -21,7 +23,7 @@ class DungeonForm(FlaskForm):
     bsp_min_partition_width = IntegerField("Minimal Room Width (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"placeholder": "5"})
     bsp_min_partition_height = IntegerField("Minimal Room Height (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"placeholder": "5"})
     number_of_floors = IntegerField("Number of Floors", validators=[Optional(), NumberRange(1, 20)], render_kw={"placeholder": "3"})
-    max_treasure_value = IntegerField("Total Treasure Value (gp)", validators=[Optional(), NumberRange(min=10)], render_kw={"placeholder": "500"})
+    total_treasure_value = IntegerField("Total Treasure Value (gp)", validators=[Optional(), NumberRange(min=10)], render_kw={"placeholder": "500"})
     cell_size = IntegerField("Cell Size", validators=[Optional(), NumberRange(10, 50)], render_kw={"placeholder": "10"})
     generate_dungeon = SubmitField("Generate Dungeon")
     toggled_advanced = HiddenField("Toggled Advancedd")
@@ -29,6 +31,21 @@ class DungeonForm(FlaskForm):
 
     def validate(self):
         if not super().validate():
+            return False
+        
+        # custom check if there are suitable monsters in database for wanted encounter level
+        encounter_level = calculate_party_level(self.average_player_level.data, self.number_of_players.data)
+        print("EL: ",encounter_level)
+        con = get_db()
+        cur = con.cursor() 
+        cur.execute("select challenge_rating from monsters")
+        all_cr = cur.fetchall()
+        a_set = set([row["challenge_rating"] for row in all_cr])
+        b_set = set(ENCOUNTER_NUMBERS[encounter_level])
+        print(a_set)
+        print(b_set)
+        if not (a_set & b_set):
+            self.average_player_level.errors.append("There are not strong enough monsters in database for this level.")
             return False
 
         if self.more_options.data:
@@ -67,11 +84,11 @@ class DungeonForm(FlaskForm):
                 if not self.number_of_floors.data:
                     self.number_of_floors.errors.append('This field is required.')
                     return False
-            if not self.max_treasure_value.data:
-                self.max_treasure_value.errors.append('This field is required.')
+            if not self.total_treasure_value.data:
+                self.total_treasure_value.errors.append('This field is required.')
                 return False
             if not self.cell_size.data:
-                self.max_treasure_value.errors.append('This field is required.')
+                self.total_treasure_value.errors.append('This field is required.')
                 return False
 
         return True

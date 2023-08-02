@@ -2,15 +2,24 @@ import random
 import svgwrite
 import pathlib
 import math
-from svgwrite import pattern
-from .desc_generator import DescriptionGenerator
+import os
+from svglib.svglib import svg2rlg
+from reportlab.lib.pagesizes import landscape
+from reportlab.pdfgen import canvas
+from reportlab.graphics import renderPDF
+from .desc_generator import DescriptionGenerator, calculate_party_level
+
+# The bin folder has the DLLs
+os.environ['path'] += r';C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\dependencies\vips-dev-8.14\bin'
+
+import pyvips
 
 DISCARD_BY_RATIO = True
 H_RATIO = 0.45
 W_RATIO = 0.45
 
 class BSPDungeon:
-    def __init__(self, bounds, seed, motif: str, cell_size: int,  average_player_level: int, number_of_players: int, max_treasure_value: int, save_path: str, db_conn = None, number_of_floors: int = 1) -> None:
+    def __init__(self, bounds, seed, motif: str, cell_size: int,  average_player_level: int, number_of_players: int, total_treasure_value: int, save_path: str, db_conn = None, number_of_floors: int = 1) -> None:
         self.bounds = bounds
         self.seed = seed
         self.db_conn = db_conn
@@ -18,31 +27,131 @@ class BSPDungeon:
         self.number_of_floors = number_of_floors
         self.motif = motif
         self.cell_size = cell_size
-        self.max_treasure_value = max_treasure_value
+        self.total_treasure_value = total_treasure_value
         self.average_player_level = average_player_level
         self.number_of_players = number_of_players
 
 
-    def generate_dungeon(self, min_partition_width, min_partition_height):
-        """Function generates one or more dungeons with descriptions and saves them as SVG images."""
+    def generate_dungeon(self, min_partition_width: int, min_partition_height: int) -> list:
+        """Function uses Binary Space Partitioning to generate one or more dungeons with descriptions and saves them as SVG images.
+
+        Args:
+            min_partition_width (int): Minimum width of partitioned subspace
+            min_partition_height (int): Minimum height of partitioned subspace
+
+        Returns:
+            list: dungeon description
+        """
+        package_path = pathlib.Path.cwd()
+        image_dir = package_path.joinpath("dungeon_generator", "static","images")
+
         floors = []
         dungeon_description = []
 
         for i in range(0, self.number_of_floors):
             file_name = f"map_bsp_{i}.svg"
+            pdf_file_name = f"map_bsp_{i}.pdf"
+            png_file_name = f"map_bsp_{i}.png"
             if i > 0:
                 bsp_tree = BSPTree(self.bounds, self.seed + i, self.cell_size, upper_floor=floors[i - 1], floor_depth=i + 1, number_of_floors=self.number_of_floors)
             else:
                 bsp_tree = BSPTree(self.bounds, self.seed, self.cell_size, upper_floor=None, floor_depth=i + 1, number_of_floors=self.number_of_floors)
             floors.append(bsp_tree.create_map(min_partition_width, min_partition_height))
-            desc = bsp_tree.place_monsters_items(self.db_conn, self.average_player_level, self.number_of_players, self.max_treasure_value, self.motif)
+            desc = bsp_tree.place_monsters_items(self.db_conn, self.average_player_level, self.number_of_players, self.total_treasure_value, self.motif)
             bsp_tree.make_svg(self.save_path, file_name)
 
-            level_description = {'level_id': i, 'desc_list': desc, 'svg_name': bsp_tree.svg_name}
+            level_description = {'level_id': i, 'desc_list': desc, 'svg_file': file_name, 'pdf_file': pdf_file_name}
             dungeon_description.append(level_description)
+
+            self.convert_svg_to_pdf(self.save_path.joinpath(file_name), image_dir.joinpath(pdf_file_name), image_dir.joinpath(png_file_name), (self.bounds.width), (self.bounds.height), level_description)   
 
 
         return  dungeon_description
+    
+
+    def convert_svg_to_pdf(self, input_svg, output_pdf, png_img, width, height, level_desc) -> None:
+        """Convert svg map and map description to pdf using reportlab library.
+
+        Args:
+            input_svg (Path): SVG file path
+            output_pdf (Path): Output PDF path
+            width (Int): SVG width
+            height (Int): SVG height
+            level_desc (list): Level description
+        """
+        
+        image = pyvips.Image.new_from_file(input_svg)
+        image.write_to_file(png_img)
+
+        # Create a new PDF canvas
+        size = (width + 100, height + 100)
+        c = canvas.Canvas(str(output_pdf), pagesize=landscape(size))
+
+        # Load the SVG image using svglib
+        #drawing = svg2rlg(input_svg)
+
+        # Set the position and scale of the SVG image on the canvas
+        x = (size[0] - width) / 2
+        y = size[1] - height - 50
+
+        # Draw the SVG image on the canvas
+        c.drawImage(png_img, x, y)
+
+        # Make new page
+        c.showPage()
+
+        text = self.level_description_to_text(level_desc)
+       
+        # Set the position for the text
+        text_x = 50
+        text_y = size[1] - 50
+
+        # Draw text
+        text_object = c.beginText(text_x, text_y)
+        text_object.setFont("Helvetica", 12)
+        for line in text.split('\n'):
+            text_object.textLine(line)
+        c.drawText(text_object)
+
+        # Save the canvas to the PDF file
+        c.save()
+
+        # Remove the png
+        os.remove(png_img)
+
+    def level_description_to_text(self, level_desc) -> str:
+        """Convert level description to string text.
+
+        Args:
+            level_desc (list): Level description
+
+        Returns:
+            str: Description of rooms in string
+        """
+        text = ""
+        desc_list = level_desc["desc_list"]
+
+        for item in desc_list:
+            text += f"Room: {str(item['cave_id'])} \n    "
+            if item["monster_desc"]:
+                number_of_monsters = item['monster_desc']["number_of_monsters"]
+                monster_name = item['monster_desc']['monster']['monster_name']
+                monster_size = item['monster_desc']['monster']['size'] 
+                monster_type =item['monster_desc']['monster']['monster_type']
+                cr = item['monster_desc']['monster']['challenge_rating']
+
+                text += f"Monsters: {number_of_monsters}× {monster_name}, {monster_size}, {monster_type}, CR: {cr}\n    "
+            if item["treasure"]:
+                item_name = item["treasure"]["item"]["item_name"]
+                item_type = item["treasure"]["item"]["item_type"]
+                weight = item["treasure"]["item"]["weight"]
+                price = item["treasure"]["item"]["price"]
+                gp = item["treasure"]["gp"]
+
+                text += f"Treasure: {item_name}, {item_type}, {weight}, {gp} gp"
+            text += "\n"
+        
+        return text
 
 
 class BSPTree:
@@ -64,8 +173,16 @@ class BSPTree:
         random.seed(seed)
         
 
-    def create_map(self, min_partition_width, min_partition_height) -> None:
-        """Function creates a representation of a dungeon map."""
+    def create_map(self, min_partition_width: int, min_partition_height: int) -> None:
+        """Function creates a representation of a dungeon map.
+
+        Args:
+            min_partition_width (int):  Minimum width of partitioned subspace
+            min_partition_height (int):  Minimum height of partitioned subspace
+
+        Returns:
+            BSPTree: self
+        """
 
         self.min_partition_width = min_partition_width
         self.min_partition_height = min_partition_height
@@ -81,8 +198,14 @@ class BSPTree:
         return self
 
 
-    def partition(self, min_width, min_height, cell_size) -> None:
-        """Apply space partitioning on root node."""
+    def partition(self, min_width: int, min_height: int, cell_size: int) -> None:
+        """Apply space partitioning on root node.
+
+        Args:
+            min_width (int): Minimum width of partitioned subspace
+            min_height (int): Minimum height of partitioned subspace
+            cell_size (int): Size of the cells in map pattern
+        """
 
         self.root.partition(min_width, min_height, cell_size)
         
@@ -92,8 +215,14 @@ class BSPTree:
         return self.root.get_leaf_nodes()
 
 
-    def create_rooms(self, min_width, min_height, cell_size) -> None:
-        """Creates a room for every leaf node in tree."""
+    def create_rooms(self, min_width: int, min_height: int, cell_size: int) -> None:
+        """Creates a room for every leaf node in tree.
+
+        Args:
+            min_width (int): Minimum room width
+            min_height (int): Minimum room height
+            cell_size (int): Size of the cells in map pattern
+        """
         for node in self.get_leaf_nodes():
             node.create_room(min_width, min_height, cell_size)
 
@@ -164,8 +293,19 @@ class BSPTree:
             self.exit = staircase
 
 
-    def place_monsters_items(self, db_conn, average_player_level, number_of_players, max_treasure_value, motif):
-        """Function creates dictionary describing item and monster placement inside the dungeon."""
+    def place_monsters_items(self, db_conn, average_player_level: int, number_of_players: int, total_treasure_value: int, motif: str) -> list:
+        """Function creates dictionary describing item and monster placement inside the dungeon.
+
+        Args:
+            db_conn (Connection): Database connection
+            average_player_level (int): Average player level
+            number_of_players (int): Number of players
+            total_treasure_value (int): Total treasure value
+            motif (str): Cave motif
+
+        Returns:
+            list: Cave descriptions
+        """
         available_motives = []
         if motif == "Random":
             motives = self.query_db(db_conn, 'select distinct motif from monsters')
@@ -173,10 +313,10 @@ class BSPTree:
                 available_motives.append(motive['motif'])
             motif = random.choice(available_motives)
 
-        encounter_level = math.floor(average_player_level * number_of_players / 4)
+        encounter_level = calculate_party_level(average_player_level, number_of_players)
         if encounter_level == 0:
             encounter_level = 1
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value)
+        desc_generator = DescriptionGenerator(encounter_level, total_treasure_value)
 
         rooms = self.get_rooms()
         room_sizes = []
@@ -246,8 +386,16 @@ class BSPTree:
         return (rv[0] if rv else None) if one else rv
 
 
-    def is_room_inside(self, outer_rect, inner_rect):
-        """Return True if room is inside another room, otherwise return False."""
+    def is_room_inside(self, outer_rect, inner_rect) -> bool:
+        """Return True if room is inside another room, otherwise return False.
+
+        Args:
+            outer_rect (Rectangle): Outer rectangle representing room
+            inner_rect (Rectangle): Inner rectangle representing rom
+
+        Returns:
+            bool: Is inner room inside outer room
+        """
         if (
             outer_rect.left <= inner_rect.left and
             outer_rect.top <= inner_rect.top and
@@ -275,8 +423,15 @@ class BSPTree:
         return closest_room
 
 
-    def make_staircase(self, room):
-        """Function creates a staircase in room."""
+    def make_staircase(self, room) -> tuple:
+        """Function creates a staircase in room.
+
+        Args:
+            room (Rectangle): Room
+
+        Returns:
+            tuple: Staircase and direction
+        """
         direction = random.choice(["left", "right", "top", "bottom"])
         staircase = Rectangle(0,0,0,0)
         staircase_width = self.cell_size * 2
@@ -311,7 +466,7 @@ class BSPTree:
             return (staircase, direction)
     
 
-    def is_corridor_through_rect(self, corridors, room):
+    def is_corridor_through_rect(self, corridors, room) -> bool:
         """Return True if corridor passes through rectangle, otherwise false."""
         for rect in corridors:
             if (
@@ -324,8 +479,16 @@ class BSPTree:
         return False
 
 
-    def make_random_door(self, rooms, direction):
-        """Function creates door in given direction and returns the door room and door as tuple."""
+    def make_random_door(self, rooms: list, direction: str) -> tuple:
+        """Function creates door in given direction and returns the door room and door as tuple.
+
+        Args:
+            rooms (list): List of available rooms
+            direction (str): Direction of the door
+
+        Returns:
+            tuple: Room with doors and door coordinates
+        """
         door_point = ()
         if direction == "left":
             door_room = min(rooms, key=lambda x: x.left)
@@ -341,8 +504,13 @@ class BSPTree:
             door_point = (random.randrange(door_room.left + self.cell_size, door_room.right - self.cell_size + 1, self.cell_size), door_room.bottom)
         return (door_room, door_point)
 
-    def make_svg(self, save_path, file_name):
-        """Function generates SVG image from BSPTree and saves it to path under the file name."""
+    def make_svg(self, save_path: str, file_name: str) -> None:
+        """Function generates SVG image from BSPTree and saves it to path under the file name.
+
+        Args:
+            save_path (str): Path in file directory where the SVG will be saved
+            file_name (str): SVG file name
+        """
         file_path = save_path.joinpath(file_name)
 
         self.svg_name = file_name
@@ -367,13 +535,13 @@ class BSPTree:
             id = number["id"]
             x = number["insert_x"]
             y = number["insert_y"]
-            text = dwg.text(id, insert=(x,y), text_anchor='middle', alignment_baseline="middle", font_size=20, fill='black')
+            text = dwg.text(id, insert=(x,y), text_anchor='middle', alignment_baseline="middle", font_size=self.cell_size * 1.5, fill='black')
             dwg.add(text)        
         
         dwg.save()
 
 
-    def draw_misc(self, dwg): 
+    def draw_misc(self, dwg) -> None: 
         """Function draws entry points, exit points and staircase.""" 
         # ENTRY
         if self.entry is not None:
@@ -457,9 +625,15 @@ class BSPNode:
         self.corridors = []
 
 
-    def partition(self, min_width, min_height, cell_size):
+    def partition(self, min_width: int, min_height: int, cell_size: int) -> None:
         """Create new nodes by dividing the node area along a horizontal or vertical line
-          and repeat on new nodes until the node bounds are smaller or equal to minimum size."""
+          and repeat on new nodes until the node bounds are smaller or equal to minimum size.
+
+        Args:
+            min_width (int): Minimum width of partitioned subspace
+            min_height (int): Minimum heigth of partitioned subspace
+            cell_size (int): Size of the cells in map pattern
+        """
         if self.bounds.width <= 2*min_width or self.bounds.height <= 2*min_height:
             return
         
@@ -489,8 +663,14 @@ class BSPNode:
         self.right_child.partition(min_width, min_height, cell_size)
 
 
-    def create_room(self, min_width, min_height, cell_size):
-        """Function places a room within nodes boundaries."""
+    def create_room(self, min_width: int, min_height: int, cell_size: int) -> None:
+        """Function places a room within nodes boundaries.
+
+        Args:
+            min_width (int): Minimum room width
+            min_height (int): Minimum room height
+            cell_size (int): Size of the cells in map pattern
+        """
        
         room_width = random.randrange(min_width, self.bounds.width - cell_size * 2 + 1, cell_size) 
         room_height = random.randrange(min_height, self.bounds.height - cell_size * 2 + 1, cell_size)
@@ -510,7 +690,7 @@ class BSPNode:
             return self.right_child.get_room()
 
 
-    def get_leaf_nodes(self):
+    def get_leaf_nodes(self) -> list:
         """Returns array of leaf nodes."""
         if self.left_child is None and self.right_child is None:
             return [self]
@@ -518,8 +698,14 @@ class BSPNode:
             return self.left_child.get_leaf_nodes() + self.right_child.get_leaf_nodes()
 
 
-    def create_sibling_corridor(self, left_child, right_child, corridor_size):
-        """Function creates corridor for two sibling nodes."""
+    def create_sibling_corridor(self, left_child, right_child, corridor_size: int) -> None:
+        """Function creates corridor for two sibling nodes.
+
+        Args:
+            left_child (BSPNode): Left child of caller node
+            right_child (BSPNode): Right child of caller node
+            corridor_size (int): Corridor size
+        """
         room_1 = left_child.get_room()
         room_2 = right_child.get_room()
 
@@ -574,7 +760,7 @@ class BSPNode:
                 self.corridors.append(Rectangle(point_1[0], point_1[1], corridor_size, abs(vertical_dif_rounded)))
 
 
-    def draw_rooms(self, svg_document, cell_size):
+    def draw_rooms(self, svg_document, cell_size: int) -> list:
         """Function draws rooms."""
         floor_index = 0
         room_numbers = []
@@ -588,7 +774,7 @@ class BSPNode:
             room_numbers.append({"id": str(floor_index + 1), "insert_x": (node.room.left + node.room.right)/2, "insert_y": (node.room.bottom + node.room.top)/2})
         return room_numbers    
 
-    def create_corridors(self, corridor_size):
+    def create_corridors(self, corridor_size: int) -> None:
         """Function iterates over the tree and creates corridors for sibling nodes."""
         if self.left_child is None and self.right_child is None:
             return
@@ -599,7 +785,7 @@ class BSPNode:
         self.create_sibling_corridor(self.left_child, self.right_child, corridor_size)
 
 
-    def draw_corridors(self, svg_document, cell_size):
+    def draw_corridors(self, svg_document, cell_size: int) -> None:
         """Function draws corridors"""
         if self.left_child is None and self.right_child is None:
             return
@@ -614,7 +800,7 @@ class BSPNode:
         self.left_child.draw_corridors(svg_document, cell_size)
         self.right_child.draw_corridors(svg_document, cell_size)
 
-    def get_corridors(self):
+    def get_corridors(self) -> list:
         """Return all corridors of the map."""
         corridors = []
         if self is None:

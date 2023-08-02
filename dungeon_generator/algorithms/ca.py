@@ -10,7 +10,7 @@ from svglib.svglib import svg2rlg
 from reportlab.lib.pagesizes import landscape
 from reportlab.pdfgen import canvas
 from reportlab.graphics import renderPDF
-from .desc_generator import DescriptionGenerator
+from .desc_generator import DescriptionGenerator, calculate_party_level
 
 
 FLOOR: int = 0
@@ -23,21 +23,31 @@ T: int = 5   # počet kamene kolem, aby byl prvek taky kamen
 F: Number = .5 # pravděpodobnost že bude bunka v čase t=0 volná
 
 
-# TODO:
-#   vkládání nepřátel, kořisti
-
 class CADungeon:
-    def __init__(self, save_path, cell_size: int, motif: str, average_player_level: int, number_of_players: int, max_treasure_value: int, db_conn = None, number_of_floors: int = 1) -> None:
+    def __init__(self, save_path, cell_size: int, motif: str, average_player_level: int, number_of_players: int, total_treasure_value: int, db_conn = None, number_of_floors: int = 1) -> None:
         self.db_conn = db_conn
         self.average_player_level = average_player_level
         self.number_of_players = number_of_players
-        self.max_treasure_value = max_treasure_value
+        self.total_treasure_value = total_treasure_value
         self.dungeon_motif = motif
         self.svg_cell_size = cell_size
         self.save_path = save_path
         self.number_of_floors = number_of_floors
 
     def generate_dungeon(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T) -> list:
+        """Function uses Cellular Automata to generate one or more dungeons with descriptions and saves them as SVG images.
+
+        Args:
+            rows (int): Number of rows in map
+            cols (int): Number of columns in map
+            seed (int): Map seed
+            floor_probability (Number, optional): Probability of cell being of type Floor when the map grid is initialized. Defaults to F.
+            number_of_iterations (int, optional): Number of cellular automata iterations. Defaults to N.
+            rock_threshold (int, optional): Number of rocks next to a cell to turn the cell into a rock. Defaults to T.
+
+        Returns:
+            list: Dungeon description
+        """
         caves = []
         dungeon_description = []
 
@@ -45,55 +55,102 @@ class CADungeon:
         pdf_dir = package_path.joinpath("dungeon_generator", "static","images")
 
         for i in range(0, self.number_of_floors):
-            file_name = "map_ca_{}.svg".format(i)
-            pdf_file_name = "map_ca_{}.pdf".format(i)
+            file_name = f"map_ca_{i}.svg"
+            pdf_file_name = f"map_ca_{i}.pdf"
             if i > 0:
                 ca_cave = CACave(rows, cols, seed + i, floor_probability, number_of_iterations, rock_threshold, upper_cave=caves[i - 1])
             else:
                 ca_cave = CACave(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold)
             caves.append(ca_cave.generate_map())
-            desc = ca_cave.place_monsters_items(self.db_conn, self.dungeon_motif, self.average_player_level, self.number_of_players, self.max_treasure_value)
-            ca_cave.make_svg(self.svg_cell_size, save_path=self.save_path, file_name=file_name)
-
-            self.convert_svg_to_pdf(self.save_path.joinpath(file_name), pdf_dir.joinpath(pdf_file_name), self.svg_cell_size * cols, self.svg_cell_size * rows)    
+            desc = ca_cave.place_monsters_items(self.db_conn, self.dungeon_motif, self.average_player_level, self.number_of_players, self.total_treasure_value)
+            ca_cave.make_svg(self.svg_cell_size, save_path=self.save_path, file_name=file_name) 
             
-            level_description = {'level_id': i, 'desc_list': desc, 'svg_name': ca_cave.svg_name}
+            level_description = {'level_id': i, 'desc_list': desc, 'svg_file': file_name, 'pdf_file': pdf_file_name}
             dungeon_description.append(level_description)
+
+            self.convert_svg_to_pdf(self.save_path.joinpath(file_name), pdf_dir.joinpath(pdf_file_name), (self.svg_cell_size * cols), (self.svg_cell_size * rows), level_description)   
 
         return dungeon_description
 
 
-    def convert_svg_to_pdf(self, input_svg, output_pdf, width, height):
-        #drawing = svg2rlg(input_svg)
-        #renderPDF.drawToFile(drawing, str(output_pdf), autoSize=0)
+    def convert_svg_to_pdf(self, input_svg, output_pdf, width, height, level_desc) -> None:
+        """Convert svg map and map description to pdf using reportlab library.
+
+        Args:
+            input_svg (Path): SVG file path
+            output_pdf (Path): Output PDF path
+            width (Int): SVG width
+            height (Int): SVG height
+            level_desc (list): Level description
+        """
         # Create a new PDF canvas
-        size = (width + 200, height + 200)
+        size = (width + 100, height + 100)
         c = canvas.Canvas(str(output_pdf), pagesize=landscape(size))
 
         # Load the SVG image using svglib
         drawing = svg2rlg(input_svg)
 
-         # Set the position and scale of the SVG image on the canvas
+        # Set the position and scale of the SVG image on the canvas
         image_width = drawing.width
         image_height = drawing.height
         x = (size[0] - image_width) / 2
-        y = size[1] - image_height
+        y = size[1] - image_height - 50
 
         # Draw the SVG image on the canvas
         renderPDF.draw(drawing, c, x, y)
 
-        text = "Toto je text."
+        # Make new page
+        c.showPage()
 
-        # Set the position for the text below the image
-        text_x = x + (image_width - c.stringWidth(text)) / 2
-        text_y = y - 20  # Adjust the distance below the image as needed
+        text = self.level_description_to_text(level_desc)
+       
+        # Set the position for the text
+        text_x = 50
+        text_y = size[1] - 50
 
-        # Add the text to the canvas
-        c.drawString(text_x, text_y, text)
+        # Draw text
+        text_object = c.beginText(text_x, text_y)
+        text_object.setFont("Helvetica", 12)
+        for line in text.split('\n'):
+            text_object.textLine(line)
+        c.drawText(text_object)
 
         # Save the canvas to the PDF file
         c.save()
 
+    def level_description_to_text(self, level_desc) -> str:
+        """Convert level description to string text.
+
+        Args:
+            level_desc (list): Level description
+
+        Returns:
+            str: Description of caves in string
+        """
+        text = ""
+        desc_list = level_desc["desc_list"]
+
+        for item in desc_list:
+            text += f"Cave: {str(item['cave_id'])} \n    "
+            if item["monster_desc"]:
+                number_of_monsters = item['monster_desc']["number_of_monsters"]
+                monster_name = item['monster_desc']['monster']['monster_name']
+                monster_size = item['monster_desc']['monster']['size'] 
+                monster_type =item['monster_desc']['monster']['monster_type']
+                cr = item['monster_desc']['monster']['challenge_rating']
+
+                text += f"Monsters: {number_of_monsters}× {monster_name}, {monster_size}, {monster_type}, CR: {cr}\n    "
+            if item["treasure"]:
+                item_name = item["treasure"]["item"]["item_name"]
+                item_type = item["treasure"]["item"]["item_type"]
+                weight = item["treasure"]["item"]["weight"]
+                price = item["treasure"]["item"]["price"]
+                gp = item["treasure"]["gp"]
+
+                text += f"Treasure: {item_name}, {item_type}, {weight}, {gp} gp"
+            text += "\n"
+        
+        return text
 
 class CACave:
     def __init__(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T, upper_cave = None) -> None:
@@ -104,7 +161,7 @@ class CACave:
         self.number_of_iterations = number_of_iterations
         self.rock_threshold = rock_threshold
         self.caves = []
-        self.upper_cave = upper_cave # Upper floor cave, only one floor cave if None
+        self.upper_cave = upper_cave
         self.start_cell = ()
         self.exit_cell = ()
         self.svg_name = ""
@@ -112,7 +169,7 @@ class CACave:
 
 
     def generate_map(self):
-
+        """Function generates grid map using Cellular Automata."""
         self.map = self.generate_grid()
 
         for _ in range(self.number_of_iterations):
@@ -132,16 +189,13 @@ class CACave:
     def make_svg(self, cell_size, save_path, file_name) -> None:
         """ Makes svg image from map and saves it to path.
         """
-        # Define the size of each cell in the map
-        CELL_SIZE = cell_size
-
         self.svg_name = file_name
 
         # Combine the path and filename to create the full file path
         file_path = save_path.joinpath(file_name)
 
-        canvas_width = '{}px'.format(CELL_SIZE * self.cols)
-        canvas_height = '{}px'.format(CELL_SIZE * self.rows)
+        canvas_width = '{}px'.format(cell_size * self.cols)
+        canvas_height = '{}px'.format(cell_size * self.rows)
 
         # Create a Drawing object and specify the file path
         dwg = svgwrite.Drawing(file_path, profile='full', size=(canvas_width, canvas_height))
@@ -151,22 +205,22 @@ class CACave:
                 if cell == FLOOR:
                     #group = dwg.add(dwg.g())
                     #group.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
-                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
+                    dwg.add(dwg.rect((y*cell_size, x*cell_size), (cell_size, cell_size), fill='white', stroke='grey', stroke_width=1))
                 elif cell == START:
-                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='blue'))
+                    dwg.add(dwg.rect((y*cell_size, x*cell_size), (cell_size, cell_size), fill='blue'))
                 elif cell == EXIT:
-                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='red'))
+                    dwg.add(dwg.rect((y*cell_size, x*cell_size), (cell_size, cell_size), fill='red'))
                 else:
-                    dwg.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='black', stroke="black"))
+                    dwg.add(dwg.rect((y*cell_size, x*cell_size), (cell_size, cell_size), fill='black', stroke="black"))
 
         for cave in self.caves:
             x, y = cave.find_id_cell()
 
             group = dwg.add(dwg.g())
-            group.add(dwg.rect((y*CELL_SIZE, x*CELL_SIZE), (CELL_SIZE, CELL_SIZE), fill='white', stroke='grey', stroke_width=1))
+            group.add(dwg.rect((y*cell_size, x*cell_size), (cell_size, cell_size), fill='white', stroke='grey', stroke_width=1))
 
             cave_index = self.caves.index(cave)
-            group.add(dwg.text(str(cave_index + 1), insert=(y * CELL_SIZE + CELL_SIZE / 2, x * CELL_SIZE + CELL_SIZE / 2), text_anchor='middle', alignment_baseline="middle", font_size=CELL_SIZE * 2, fill='black'))
+            group.add(dwg.text(str(cave_index + 1), insert=(y * cell_size + cell_size / 2, x * cell_size + cell_size / 2), text_anchor='middle', alignment_baseline="middle", font_size=cell_size * 1.5, fill='black'))
     
         dwg.save()
 
@@ -238,7 +292,7 @@ class CACave:
         return x >= 0 and y >= 0 and x < self.rows and y < self.cols
     
 
-    def process_map(self, rock_threshold_size:int = 10, floor_threshold_size:int = 10):
+    def process_map(self, rock_threshold_size:int = 10, floor_threshold_size:int = 10) -> None:
         """Process the map by filling small unwanted regions and connecting remaining caves.
 
         Args:
@@ -324,6 +378,9 @@ class CACave:
 
     def connect_close_caves(self, force_access_from_main: bool = False) -> None:
         """Connect the caves that are closest to each other.
+
+        Args:
+            force_access_from_main (bool, optional): Force accessability to all caves from main cave. Defaults to False.
         """
         accessible_caves_from_main = []
         not_accessible_caves_from_main = []
@@ -372,8 +429,15 @@ class CACave:
 
 
     def find_closest_pair(self, region_a, region_b) -> tuple:
-        """Find coordinates and distance of closest cells from two regions using KDTree.
-        """
+        """Find coordinates and distance of closest cells from two regions A and B using KDTree.
+
+        Args:
+            region_a (list): list of cells representing region A in cave
+            region_b (list): list of cells representing region B in cave
+
+        Returns:
+            tuple: Coordinates and distance of closest cells
+        """ 
        # Convert the cells in each region to points in the 2D space
         points_a = [(x, y) for x, y in region_a]
         points_b = [(x, y) for x, y in region_b]
@@ -402,14 +466,28 @@ class CACave:
         return (closest_pair, min_distance)
 
 
-    def create_passage(self, cave, other_cave, cell, other_cell) -> None:
-        cave.connect_caves(other_cave)
-        line = self.get_line_coordinates(cell, other_cell)
+    def create_passage(self, cave_a, cave_b, cell_a, cell_b) -> None:
+        """Create passage using draw_circle between two caves A and B.
+
+        Args:
+            cave_a (_type_): instance of Cave
+            cave_b (_type_): instance of Cave
+            cell_a (tuple): coordinates of cell in cave_a
+            cell_b (tuple): coordinates of cell in cave_b
+        """
+        cave_a.connect_caves(cave_b)
+        line = self.get_line_coordinates(cell_a, cell_b)
         for cord in line:
             self.draw_circle(cord, 2)
 
 
     def draw_circle(self, cord, r) -> None:
+        """Draw circle at specified coordinates with given radius.
+
+        Args:
+            cord (tuple): coordinates of circle
+            r (number): circle radius
+        """
         cx, cy = cord
         for x in range(-r, r):
             for y in range(-r, r):
@@ -421,9 +499,15 @@ class CACave:
 
 
     def get_line_coordinates(self, start, end) -> list:
-        """
-        Function returns a list of tuples representing the coordinates of all the points on a line
+        """Function returns a list of tuples representing the coordinates of all the points on a line
         between start coordinates and end coordinates.
+
+        Args:
+            start (tuple): start coordinates
+            end (tuple): end coordinates
+
+        Returns:
+            list: list of coordinates
         """
         x1, y1 = start
         x2, y2 = end
@@ -446,10 +530,9 @@ class CACave:
 
     def place_start_end(self) -> None:
         """Function randomly places a start and an end inside the map. If there is more floors the end point will be the connection to next floor."""
-
+        #ENTRY
         if self.upper_cave is None:
-            # když není patro nad tímhle, udelej random start
-            #START
+            # if no upper cave, choose random entry cell
             start_cave = RNG.choice(self.caves)
             start_cell_index = RNG.randint(0, start_cave.cave_size)
             start_x, start_y = start_cave.cells[start_cell_index]
@@ -457,9 +540,9 @@ class CACave:
             self.start_cell = (start_x, start_y)
             self.map[start_x][start_y] = START
         else:
-            # kdyz je další patro, udelej random start nebo start jako exit vrchního patra
+            # if more caves, make random entry or entry same cell as the upper cave exit or the closest cell
             if RNG.random() < .5:
-                #random start
+                # random entry cell
                 start_cave = RNG.choice(self.caves)
                 start_cell_index = RNG.randint(0, start_cave.cave_size)
                 start_x, start_y = start_cave.cells[start_cell_index]
@@ -467,7 +550,8 @@ class CACave:
                 self.start_cell = (start_x, start_y)
                 self.map[start_x][start_y] = START
             else:
-                #start na exitu z vrchního patra nebo blízko něj
+                # entry same as upper cave exit or closest
+                # use flood-fill to find closest cell to upper cave exit
                 upper_exit_x, upper_exit_y = self.upper_cave.exit_cell
                 map_flags = np.zeros((self.rows, self.cols))
 
@@ -491,6 +575,7 @@ class CACave:
                 self.map[start_x][start_y] = START
 
         #EXIT
+        # make random exit cell within specified range
         map_copy = copy.deepcopy(self.map)
         distance = float('inf')
         min_distance = (self.rows // 2 - 5) * (self.rows // 2 - 5) + (self.cols // 2 - 5) * (self.cols // 2 - 5)
@@ -515,18 +600,31 @@ class CACave:
             self.map[exit_x][exit_y] = EXIT
         
 
-    def place_monsters_items(self, db_conn, motif, average_level, number_of_players, max_treasure_value) -> list:
-        """Function creates dictionary describing item and monster placement inside the dungeon."""
+    def place_monsters_items(self, db_conn, motif: str, average_level: Number, number_of_players: Number, total_treasure_value: Number) -> list:
+        """Function creates dictionary describing item and monster placement inside the dungeon.
+
+        Args:
+            db_conn (Connection): Database connection
+            motif (String): Cave motif
+            average_level (Number): Average player level
+            number_of_players (Number): Number of players
+            total_treasure_value (Number): Total treasure value
+
+        Returns:
+            list: Cave descriptions
+        """
         available_motives = []
         if motif == "Random":
             motives = self.query_db(db_conn, 'select distinct motif from monsters')
             for motive in motives:
                 available_motives.append(motive['motif'])
             motif = RNG.choice(available_motives)
-        encounter_level = math.floor(average_level * number_of_players / 4)
+
+        encounter_level = calculate_party_level(average_level, number_of_players)
         if encounter_level == 0:
             encounter_level = 1
-        desc_generator = DescriptionGenerator(encounter_level, max_treasure_value)
+        desc_generator = DescriptionGenerator(encounter_level, total_treasure_value)
+
         smaller_monsters_sizes = ["Fine", "Diminutive", "Tiny", "Small", "Medium"]
         larger_monsters_sizes = ["Medium", "Large", "Huge", "Gargantuan", "Colossal"]
         smaller_monsters = self.query_db(db_conn, "select * from monsters where size in ({}) and challenge_rating <= ? and motif = ?".format(','.join(['?'] * len(smaller_monsters_sizes))), smaller_monsters_sizes + [encounter_level, motif])
@@ -547,7 +645,7 @@ class CACave:
 
         smallest_caves_start_index = number_of_caves - math.ceil(number_of_caves * 0.2)  
         
-        # projdu nejvetší jeskyně
+        # largest caves, large monsters and treasure
         for cave in self.caves[:large_caves_end_index]:
             if larger_monsters:
                 monster_description = desc_generator.generate_monster_description(larger_monsters)
@@ -556,12 +654,12 @@ class CACave:
             treasure_description = desc_generator.generate_treasure_description(items)
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': monster_description, 'treasure': treasure_description})    
         
-        # projdu nejmensi jeskyne
+        # smallest caves, treasure
         for cave in self.caves[smallest_caves_start_index:]:
             treasure_description = desc_generator.generate_treasure_description(items)
             dungeon_description.append({'cave_id': self.caves.index(cave), 'monster_desc': {}, 'treasure': treasure_description})
         
-        # zbytek jeskyni
+        # rest of the caves, smaller monsters or nothing
         for cave in self.caves[large_caves_end_index:smallest_caves_start_index]:
             monster_description = {}
             if RNG.random() < .4:
@@ -571,6 +669,7 @@ class CACave:
 
         dungeon_description = sorted(dungeon_description, key=lambda x: x['cave_id'])
 
+        # add rest of the value to random cave
         if desc_generator.rest_of_value > 0:
             dungeon_description[len(dungeon_description) - 1]["treasure"]["gp"] += desc_generator.rest_of_value
 
@@ -578,6 +677,7 @@ class CACave:
 
 
     def query_db(self, db_conn, query, args=(), one=False):
+        """Query databse and return the result."""
         cur = db_conn.cursor().execute(query, args)
         rv = cur.fetchall()
         cur.close()
@@ -595,18 +695,23 @@ class Cave:
         self.id_cell_x, self.id_cell_y = sorted(self.cells, key=lambda a: a[0])[self.cave_size // 2]
 
 
-    def get_cave_size(self):
+    def get_cave_size(self) -> int:
+        """Return cave size"""
         return self.cave_size
     
-    def make_accessible_from_main(self):
+    def make_accessible_from_main(self) -> None:
+        """Mark this cave and all connected caves as accessible from main cave."""
         if not self.accessible_from_main_cave:
             self.accessible_from_main_cave = True
             for connected_cave in self.connected_caves:
                 connected_cave.make_accessible_from_main()
 
-    def connect_caves(self, other_cave):
-        """Connects two caves."""
+    def connect_caves(self, other_cave) -> None:
+        """Connects two caves.
 
+        Args:
+            other_cave (Cave): Cave to be connected
+        """
         if self.accessible_from_main_cave:
             other_cave.make_accessible_from_main()
         elif other_cave.accessible_from_main_cave:
@@ -615,8 +720,15 @@ class Cave:
         self.connected_caves.append(other_cave)
         other_cave.connected_caves.append(self)
 
-    def is_connected(self, other_cave):
-        """Checks if other cave is connected."""
+    def is_connected(self, other_cave) -> bool:
+        """Checks if other cave is connected.
+
+        Args:
+            other_cave (Cave): Cave to check connection with
+
+        Returns:
+            bool: is cave connected to other_cave
+        """
 
         return other_cave in self.connected_caves
     

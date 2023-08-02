@@ -8,7 +8,7 @@
     <main class="container-fluid d-flex vh-100 justify-content-center align-items-center">
         <form class="col-4" method="POST" action="/generate" novalidate >
             {{form.hidden_tag()}}
-            <div>
+            <div class="mb-3">
                 {{ form.seed.label(class="form-label") }}
                 {{ form.seed(class="form-control") }}
                 {% for error in form.seed.errors %}
@@ -65,8 +65,9 @@
                 </div>
             </div>
             <div id="advancedOptions">
-                <div id="optionsCA" class="d-flex flex-column mb-3">
-                    <div class="d-flex flex-row">
+                <div id="optionsCA" class="d-flex flex-column">
+                    <p class="border border-danger border-start-0 border-end-0 mb-3">Chosen dungeon type uses cellular automata to generate the dungeon map. For more information see section 3.1 in the Bachelor thesis.</p>
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill me-3">
                             {{ form.ca_rows.label(class="form-label") }}
                             {{ form.ca_rows(class="form-control dynamic-input-CA") }}
@@ -86,7 +87,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="d-flex flex-row">
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill me-3">
                             {{ form.floor_probability.label(class="form-label") }}
                             {{ form.floor_probability(class="form-control dynamic-input-CA") }}
@@ -106,7 +107,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="d-flex flex-row">
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill me-3">
                             {{ form.number_of_iterations.label(class="form-label") }}
                             {{ form.number_of_iterations(class="form-control dynamic-input-CA") }}
@@ -127,8 +128,9 @@
                         </div>
                     </div>
                 </div>
-                <div id="optionsBSP" class="d-flex flex-column mb-3">
-                    <div class="d-flex flex-row">
+                <div id="optionsBSP" class="d-flex flex-column">
+                    <p class="border border-danger border-start-0 border-end-0 mb-3">Chosen dungeon type uses binary space partitioning to generate the dungeon map. For more information see section 3.2 in the Bachelor thesis.</p>
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill me-3">
                             {{ form.bsp_rows.label(class="form-label") }}
                             {{ form.bsp_rows(class="form-control dynamic-input-BSP") }}
@@ -148,7 +150,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="d-flex flex-row">
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill me-3">
                             {{ form.bsp_min_partition_width.label(class="form-label") }}
                             {{ form.bsp_min_partition_width(class="form-control dynamic-input-BSP") }}
@@ -168,7 +170,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="d-flex flex-row">
+                    <div class="d-flex flex-row mb-3">
                         <div class="flex-fill">
                             {{ form.number_of_floors.label(class="form-label") }}
                             {{ form.number_of_floors(class="form-control dynamic-input-BSP") }}
@@ -182,9 +184,9 @@
                 </div>
                 <div class="d-flex flex-row mb-3">
                     <div class="flex-fill me-3">
-                        {{ form.max_treasure_value.label(class="form-label") }}
-                            {{ form.max_treasure_value(class="form-control dynamic-input") }}
-                            {% for error in form.max_treasure_value.errors %}
+                        {{ form.total_treasure_value.label(class="form-label") }}
+                            {{ form.total_treasure_value(class="form-control dynamic-input") }}
+                            {% for error in form.total_treasure_value.errors %}
                             <div class="text-danger">
                                 <small>{{ error }}</small>
                             </div>

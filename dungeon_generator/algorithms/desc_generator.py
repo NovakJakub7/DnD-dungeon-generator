@@ -46,12 +46,20 @@ TREASURE: list = [{"number_of_dice": 2, "dice_size": 8, "treasure_base": 10},
 
 
 class DescriptionGenerator:
-    def __init__(self, encounter_level: int, max_treasure_value: int) -> None: 
+    def __init__(self, encounter_level: int, total_treasure_value: int) -> None: 
         self.encounter_level = encounter_level
-        self.max_treasure_value = max_treasure_value
-        self.rest_of_value = max_treasure_value
+        self.total_treasure_value = total_treasure_value
+        self.rest_of_value = total_treasure_value
 
     def generate_monster_description(self, monsters: list) -> dict:
+        """Function generates monsters and their number of occurences for a room.
+
+        Args:
+            monsters (list): list available monsters
+
+        Returns:
+            dict: Monster and number of occurrences
+        """
         monster = random.choice(monsters)
         cr = monster['challenge_rating']
 
@@ -60,35 +68,45 @@ class DescriptionGenerator:
             cr = monster['challenge_rating']
 
         ecl_row = ENCOUNTER_NUMBERS[self.encounter_level]
-        # kdyz picknu cr v prvnim sloupci tak cr dám na ecl aby jsem nasel index
+        # find challenge rating base on ENCOUNTER_NUMBERS table
         if cr not in ecl_row:
             cr = self.encounter_level
-        # najdu index
+        # find index
         row_index = ecl_row.index(cr) + 1
-        # hodnota v 0 radku na indexu je mnozstvi monster
+        # values in row at index 0 are the number of monsters
         number_of_monsters = ENCOUNTER_NUMBERS[0][row_index]
-        # kdyz je monster vic nez 5, mam na vyber z intervalu -1, +1 k vybrane hodnote
+        # if more than 5 monsters, add or substract one monster
         if number_of_monsters > 5:
             number_of_monsters = random.randint(number_of_monsters - 1, number_of_monsters + 1)
         
         return {'monster': monster, 'number_of_monsters': number_of_monsters}
 
 
-    def generate_treasure_description(self, items):
+    def generate_treasure_description(self, items: list) -> dict:
+        """Function generates treasure description for a room.
+
+        Args:
+            items (list): Available items
+
+        Returns:
+            dict: Treasure description containing item and/or gp
+        """
         item = None
         gp = 0
         both = random.choice([False, True])
         only_item = random.choice([False, True])
         lowest_price = sorted(items, key=lambda x: x["price"])[0]["price"]
 
-        if self.max_treasure_value < 0: #random itemy / gp podle levelu
+        # random items / gp based on player level
+        if self.total_treasure_value < 0:
             treasure_row = TREASURE[self.encounter_level - 1]
             max_gp = self.roll_dice(treasure_row["number_of_dice"], treasure_row["dice_size"]) * treasure_row["treasure_base"]
             min_gp = max_gp - treasure_row["treasure_base"]
             gp = random.randint(min_gp, max_gp)
             item = random.choice(items)
         elif self.rest_of_value > 0:
-            if self.rest_of_value > lowest_price and both: # vyberu item a gp v urcite hodnote k max_value
+            # pick items and gp based on total treasure value
+            if self.rest_of_value > lowest_price and both:
                 item = random.choice(items)
                 while item["price"] >= self.rest_of_value:
                     item = random.choice(items)
@@ -109,9 +127,22 @@ class DescriptionGenerator:
         
 
     def roll_dice(self, number_of_dice: int, dice_size: int) -> int:
+        """Function simulates a dice roll
+
+        Args:
+            number_of_dice (int): Number of dice to be thrown
+            dice_size (int): Dice size
+
+        Returns:
+            int: Sum of rolled values
+        """
         return sum(random.randint(1, dice_size) for _ in range(number_of_dice))
+    
 
-
-if __name__ == "__main__":
-   ecl = 5
-   print(TREASURE[ecl - 1]["dice_size"])
+def calculate_party_level(average_player_level: int, number_of_players: int) -> int:
+    party_level = average_player_level + math.floor((number_of_players - 4) / 2)
+    if party_level < 1:
+        party_level = 1
+    elif party_level > 20:
+        party_level = 20
+    return party_level

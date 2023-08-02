@@ -14,18 +14,13 @@ def generate():
     populate_motif_field(form)
 
     if request.method == 'POST' and form.validate():
-        # vezmu data z databaze
         db_conn = get_db()
-
-        # vezmu data z formulare
+        # get form data
         form_data = form.data
 
-        #print(options)
         map_description = generator.generate_map(form_data, db_conn)
         
         return render_template("dungeon.html", map_description = map_description, logged = logged)
-    
-    #form = DungeonForm()
     
     return render_template("index.html", logged = logged, form = form)
 
@@ -136,6 +131,7 @@ def home():
 
 def is_logged():
     return False if g.user is None else True
+
 
 def populate_motif_field(form):
     con = get_db()
