@@ -9,8 +9,11 @@ from reportlab.pdfgen import canvas
 from reportlab.graphics import renderPDF
 from .desc_generator import DescriptionGenerator, calculate_party_level
 
-# The bin folder has the DLLs
-os.environ['path'] += r';C:\Users\jakub\Documents\studium\DnD-dungeon-generator\dungeon_generator\dependencies\vips-dev-8.14\bin'
+current_directory = pathlib.Path.cwd()
+dlls_folder = current_directory.joinpath("dungeon_generator", "dependencies", "vips-dev-8.14", "bin")
+
+os.add_dll_directory(dlls_folder)
+os.environ['PATH'] += os.pathsep + str(dlls_folder)
 
 import pyvips
 
