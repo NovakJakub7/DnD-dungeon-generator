@@ -44,7 +44,6 @@ def generate_map(selected_options, db_conn) -> list:
             rock_threshold = ca.T
             number_of_levels = 1
         
-        print(number_of_levels)
         d = ca.CADungeon(save_path, cell_size, dungeon_motif, average_player_level, number_of_players, total_treasure_value, db_conn, number_of_levels)
         dungeon_description = d.generate_dungeon(rows, cols, seed, floor_probability, number_of_iterations, rock_threshold)
     else:

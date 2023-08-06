@@ -10,7 +10,7 @@ from svglib.svglib import svg2rlg
 from reportlab.lib.pagesizes import landscape
 from reportlab.pdfgen import canvas
 from reportlab.graphics import renderPDF
-from .desc_generator import DescriptionGenerator, calculate_party_level
+from .desc_generator import DescriptionGenerator, calculate_party_level, level_description_to_text
 
 
 FLOOR: int = 0
@@ -102,7 +102,7 @@ class CADungeon:
         # Make new page
         c.showPage()
 
-        text = self.level_description_to_text(level_desc)
+        text = level_description_to_text(level_desc, "CA")
        
         # Set the position for the text
         text_x = 50
@@ -118,39 +118,7 @@ class CADungeon:
         # Save the canvas to the PDF file
         c.save()
 
-    def level_description_to_text(self, level_desc) -> str:
-        """Convert level description to string text.
-
-        Args:
-            level_desc (list): Level description
-
-        Returns:
-            str: Description of caves in string
-        """
-        text = ""
-        desc_list = level_desc["desc_list"]
-
-        for item in desc_list:
-            text += f"Cave: {str(item['cave_id'])} \n    "
-            if item["monster_desc"]:
-                number_of_monsters = item['monster_desc']["number_of_monsters"]
-                monster_name = item['monster_desc']['monster']['monster_name']
-                monster_size = item['monster_desc']['monster']['size'] 
-                monster_type =item['monster_desc']['monster']['monster_type']
-                cr = item['monster_desc']['monster']['challenge_rating']
-
-                text += f"Monsters: {number_of_monsters}× {monster_name}, {monster_size}, {monster_type}, CR: {cr}\n    "
-            if item["treasure"]:
-                item_name = item["treasure"]["item"]["item_name"]
-                item_type = item["treasure"]["item"]["item_type"]
-                weight = item["treasure"]["item"]["weight"]
-                price = item["treasure"]["item"]["price"]
-                gp = item["treasure"]["gp"]
-
-                text += f"Treasure: {item_name}, {item_type}, {weight}, {gp} gp"
-            text += "\n"
-        
-        return text
+    
 
 class CACave:
     def __init__(self, rows: int, cols: int, seed: int, floor_probability: Number = F, number_of_iterations: int = N, rock_threshold: int = T, upper_cave = None) -> None:

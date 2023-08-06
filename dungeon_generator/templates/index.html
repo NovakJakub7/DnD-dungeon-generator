@@ -220,13 +220,12 @@
         window.onload = function(){
             document.getElementById("seed").value = randomNumber()
         };
-
         $(document).ready(function () {
             $('.dynamic-input-CA, .dynamic-input-BSP, .dynamic-input').prop('required', false);
             if($('#toggled_advanced').val() == "False"){
                 $('#advancedOptions').hide();
             }
-            
+
             $('.showAdvanced').click(function() {
                 if ($('#advancedOptions').is(':hidden')) {
                     $('#advancedOptions').slideDown();

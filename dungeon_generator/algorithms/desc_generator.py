@@ -140,9 +140,64 @@ class DescriptionGenerator:
     
 
 def calculate_party_level(average_player_level: int, number_of_players: int) -> int:
+    """Calculate party level based on average player level and number of players.
+
+    Args:
+        average_player_level (int): Average player level
+        number_of_players (int): Number of players
+
+    Returns:
+        int: Party level
+    """
     party_level = average_player_level + math.floor((number_of_players - 4) / 2)
     if party_level < 1:
         party_level = 1
     elif party_level > 20:
         party_level = 20
     return party_level
+
+
+def level_description_to_text(level_desc, dungeon_type:str) -> str:
+        """Convert level description to string text.
+
+        Args:
+            level_desc (list): Level description
+
+        Returns:
+            str: Description of caves in string
+        """
+        if dungeon_type == "CA":
+            room = "Cave"
+        elif dungeon_type == "BSP":
+            room = "Room"
+
+        text = ""
+        desc_list = level_desc["desc_list"]
+
+        for item in desc_list:
+            text += f"{room}: {str(item['cave_id'])} \n    "
+            if item["monster_desc"]:
+                number_of_monsters = item['monster_desc']["number_of_monsters"]
+                monster_name = item['monster_desc']['monster']['monster_name']
+                monster_size = item['monster_desc']['monster']['size'] 
+                monster_type =item['monster_desc']['monster']['monster_type']
+                cr = item['monster_desc']['monster']['challenge_rating']
+
+                text += f"Monsters: {number_of_monsters}× {monster_name}, {monster_size}, {monster_type}, CR: {cr}"
+                if item["treasure"]:
+                   text += "\n    "
+            if item["treasure"]:
+                if item["treasure"]["item"]:
+                    item_name = item["treasure"]["item"]["item_name"]
+                    item_type = item["treasure"]["item"]["item_type"]
+                    weight = item["treasure"]["item"]["weight"]
+                    price = item["treasure"]["item"]["price"]
+                    text += f"Treasure: {item_name}, {item_type}, {weight}, {price} gp"
+                if item["treasure"]["gp"] > 0:
+                    gp = item["treasure"]["gp"]
+                    text += f"    gp: {gp}"
+            if not item["monster_desc"] and not item["treasure"]:
+                text += f"{room} seems to be empty"
+            text += "\n"
+        
+        return text

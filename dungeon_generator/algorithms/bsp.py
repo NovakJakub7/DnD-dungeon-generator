@@ -7,8 +7,9 @@ from svglib.svglib import svg2rlg
 from reportlab.lib.pagesizes import landscape
 from reportlab.pdfgen import canvas
 from reportlab.graphics import renderPDF
-from .desc_generator import DescriptionGenerator, calculate_party_level
+from .desc_generator import DescriptionGenerator, calculate_party_level, level_description_to_text
 
+# needed for pyvips library functionality
 current_directory = pathlib.Path.cwd()
 dlls_folder = current_directory.joinpath("dungeon_generator", "dependencies", "vips-dev-8.14", "bin")
 
@@ -103,7 +104,7 @@ class BSPDungeon:
         # Make new page
         c.showPage()
 
-        text = self.level_description_to_text(level_desc)
+        text = level_description_to_text(level_desc, "BSP")
        
         # Set the position for the text
         text_x = 50
@@ -121,40 +122,6 @@ class BSPDungeon:
 
         # Remove the png
         os.remove(png_img)
-
-    def level_description_to_text(self, level_desc) -> str:
-        """Convert level description to string text.
-
-        Args:
-            level_desc (list): Level description
-
-        Returns:
-            str: Description of rooms in string
-        """
-        text = ""
-        desc_list = level_desc["desc_list"]
-
-        for item in desc_list:
-            text += f"Room: {str(item['cave_id'])} \n    "
-            if item["monster_desc"]:
-                number_of_monsters = item['monster_desc']["number_of_monsters"]
-                monster_name = item['monster_desc']['monster']['monster_name']
-                monster_size = item['monster_desc']['monster']['size'] 
-                monster_type =item['monster_desc']['monster']['monster_type']
-                cr = item['monster_desc']['monster']['challenge_rating']
-
-                text += f"Monsters: {number_of_monsters}× {monster_name}, {monster_size}, {monster_type}, CR: {cr}\n    "
-            if item["treasure"]:
-                item_name = item["treasure"]["item"]["item_name"]
-                item_type = item["treasure"]["item"]["item_type"]
-                weight = item["treasure"]["item"]["weight"]
-                price = item["treasure"]["item"]["price"]
-                gp = item["treasure"]["gp"]
-
-                text += f"Treasure: {item_name}, {item_type}, {weight}, {gp} gp"
-            text += "\n"
-        
-        return text
 
 
 class BSPTree:
@@ -266,7 +233,6 @@ class BSPTree:
         if self.upper_floor is None:
             entry_direction = random.choice(directions)
             entry_room, entry_point  = self.make_random_door(rooms, entry_direction)
-            print("Entry direction:", entry_direction, "Entry point:", entry_point)
             self.entry_direction = entry_direction
             self.entry = entry_point         
         else: # make entry (staircase) based on upper floor exit
@@ -463,7 +429,7 @@ class BSPTree:
         corridors = self.get_corridors()
 
         if self.is_corridor_through_rect(corridors, staircase):
-            print("CORRIDOR IS THROUGH")
+            #print("CORRIDOR IS THROUGH")
             return self.make_staircase(room)
         else:
             return (staircase, direction)

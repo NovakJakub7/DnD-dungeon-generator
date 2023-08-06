@@ -35,15 +35,12 @@ class DungeonForm(FlaskForm):
         
         # custom check if there are suitable monsters in database for wanted encounter level
         encounter_level = calculate_party_level(self.average_player_level.data, self.number_of_players.data)
-        print("EL: ",encounter_level)
         con = get_db()
         cur = con.cursor() 
         cur.execute("select challenge_rating from monsters")
         all_cr = cur.fetchall()
         a_set = set([row["challenge_rating"] for row in all_cr])
         b_set = set(ENCOUNTER_NUMBERS[encounter_level])
-        print(a_set)
-        print(b_set)
         if not (a_set & b_set):
             self.average_player_level.errors.append("There are not strong enough monsters in database for this level.")
             return False
