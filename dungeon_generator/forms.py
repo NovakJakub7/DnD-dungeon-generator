@@ -10,38 +10,47 @@ class DungeonForm(FlaskForm):
     dungeon_type = SelectField("Dungeon Type", validators=[InputRequired()], choices=[("CA", "Natural Cavern Complex"), ("BSP", "Ruined/Occupied Structure")])
     dungeon_size = SelectField("Dungeon Size", validators=[InputRequired()], coerce=int, choices=[(40, "Small"), (60, "Medium"), (80, "Large"), (100, "Huge")])
     dungeon_motif = SelectField("Dungeon Motif", validators=[InputRequired()])
-    number_of_players = IntegerField("Number of Players (1-10)", validators=[InputRequired(), NumberRange(1, 10)], render_kw={"placeholder": "1"})
-    average_player_level = IntegerField("Average player level (1-20)", validators=[InputRequired(), NumberRange(1, 20)], render_kw={"placeholder": "1"})
-    ca_rows = IntegerField("Number of Rows", validators=[Optional(), NumberRange(30, 200)], render_kw={"placeholder": "50"})
-    ca_columns = IntegerField("Number of Columns", validators=[Optional(), NumberRange(30, 200)], render_kw={"placeholder": "50"})
-    floor_probability = FloatField("Floor Probability in T = 0", validators=[Optional(), NumberRange(0.1, 0.9)], render_kw={"placeholder": "0.5", "step": "any"})
-    rock_threshold = IntegerField("Rock Threshold", validators=[Optional(), NumberRange(1, 8)], render_kw={"placeholder": "5"})
-    number_of_iterations = IntegerField("Number of Cellular Automata Iterations", validators=[Optional(), NumberRange(2, 20)], render_kw={"placeholder": "3"})
-    number_of_levels = IntegerField("Number of Levels", validators=[Optional(), NumberRange(1, 20)], render_kw={"placeholder": "2"})
-    bsp_rows = IntegerField("Number of Rows", validators=[Optional(), NumberRange(30, 200)], render_kw={"placeholder": "50"})
-    bsp_cols = IntegerField("Number of Columns", validators=[Optional(), NumberRange(30, 200)], render_kw={"placeholder": "50"})
-    bsp_min_partition_width = IntegerField("Minimal Room Width (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"placeholder": "5"})
-    bsp_min_partition_height = IntegerField("Minimal Room Height (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"placeholder": "5"})
-    number_of_floors = IntegerField("Number of Floors", validators=[Optional(), NumberRange(1, 20)], render_kw={"placeholder": "3"})
-    total_treasure_value = IntegerField("Total Treasure Value (gp)", validators=[Optional(), NumberRange(min=10)], render_kw={"placeholder": "500"})
-    cell_size = IntegerField("Cell Size", validators=[Optional(), NumberRange(10, 50)], render_kw={"placeholder": "10"})
+    number_of_players = IntegerField("Number of Players (1-10)", validators=[InputRequired(), NumberRange(1, 10)], render_kw={"value": "1"})
+    average_player_level = IntegerField("Average player level (1-20)", validators=[InputRequired(), NumberRange(1, 20)], render_kw={"value": "1"})
+    ca_rows = IntegerField("Number of Rows", validators=[Optional(), NumberRange(30, 200)], render_kw={"value": "50"})
+    ca_columns = IntegerField("Number of Columns", validators=[Optional(), NumberRange(30, 200)], render_kw={"value": "50"})
+    floor_probability = FloatField("Floor Probability in T = 0", validators=[Optional(), NumberRange(0.1, 0.9)], render_kw={"value": "0.5", "step": "any"})
+    rock_threshold = IntegerField("Rock Threshold", validators=[Optional(), NumberRange(1, 8)], render_kw={"value": "5"})
+    number_of_iterations = IntegerField("Number of Cellular Automata Iterations", validators=[Optional(), NumberRange(2, 20)], render_kw={"value": "3"})
+    number_of_levels = IntegerField("Number of Levels", validators=[Optional(), NumberRange(1, 20)], render_kw={"value": "2"})
+    bsp_rows = IntegerField("Number of Rows", validators=[Optional(), NumberRange(30, 200)], render_kw={"value": "50"})
+    bsp_cols = IntegerField("Number of Columns", validators=[Optional(), NumberRange(30, 200)], render_kw={"value": "50"})
+    bsp_min_partition_width = IntegerField("Minimal Room Width (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"value": "5"})
+    bsp_min_partition_height = IntegerField("Minimal Room Height (cells)", validators=[Optional(), NumberRange(2, 50)], render_kw={"value": "5"})
+    number_of_floors = IntegerField("Number of Floors", validators=[Optional(), NumberRange(1, 20)], render_kw={"value": "3"})
+    total_treasure_value = IntegerField("Total Treasure Value (gp)", validators=[Optional(), NumberRange(min=10)], render_kw={"value": "500"})
+    cell_size = IntegerField("Cell Size", validators=[Optional(), NumberRange(10, 50)], render_kw={"value": "10"})
     generate_dungeon = SubmitField("Generate Dungeon")
     toggled_advanced = HiddenField("Toggled Advancedd")
     more_options = BooleanField("Show More Options")
+
 
     def validate(self):
         if not super().validate():
             return False
         
+        motif = self.dungeon_motif.data
+        print(motif)
         # custom check if there are suitable monsters in database for wanted encounter level
         encounter_level = calculate_party_level(self.average_player_level.data, self.number_of_players.data)
         con = get_db()
         cur = con.cursor() 
-        cur.execute("select challenge_rating from monsters")
+        if motif == "Random":
+            cur.execute("select challenge_rating from monsters")
+        else:
+            cur.execute("select challenge_rating from monsters where motif = ?", [motif])
         all_cr = cur.fetchall()
         a_set = set([row["challenge_rating"] for row in all_cr])
         b_set = set(ENCOUNTER_NUMBERS[encounter_level])
-        if not (a_set & b_set):
+        print(a_set)
+        print(b_set)
+        print(len(a_set.intersection(b_set)))
+        if len(a_set.intersection(b_set)) == 0:
             self.average_player_level.errors.append("There are not strong enough monsters in database for this level.")
             return False
 

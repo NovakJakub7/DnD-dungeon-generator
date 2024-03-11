@@ -7,7 +7,7 @@ from svglib.svglib import svg2rlg
 from reportlab.lib.pagesizes import landscape
 from reportlab.pdfgen import canvas
 from reportlab.graphics import renderPDF
-from .desc_generator import DescriptionGenerator, calculate_party_level, level_description_to_text
+from .desc_generator import DescriptionGenerator, calculate_party_level, level_description_to_text, ENCOUNTER_NUMBERS
 
 # needed for pyvips library functionality
 current_directory = pathlib.Path.cwd()
@@ -275,18 +275,27 @@ class BSPTree:
         Returns:
             list: Cave descriptions
         """
-        available_motives = []
-        if motif == "Random":
-            motives = self.query_db(db_conn, 'select distinct motif from monsters')
-            for motive in motives:
-                available_motives.append(motive['motif'])
-            motif = random.choice(available_motives)
-
         encounter_level = calculate_party_level(average_player_level, number_of_players)
         if encounter_level == 0:
             encounter_level = 1
         desc_generator = DescriptionGenerator(encounter_level, total_treasure_value)
 
+        available_motives = []
+        motif_found = False
+        if motif == "Random":
+            motives = self.query_db(db_conn, 'select distinct motif from monsters')
+            for motive in motives:
+                available_motives.append(motive['motif'])
+            while not motif_found:
+                motif = random.choice(available_motives)
+                ratings = self.query_db(db_conn, 'select challenge_rating from monsters where motif = ?', [motif])
+                rating_set = set([row["challenge_rating"] for row in ratings])
+                encounter_set = set(ENCOUNTER_NUMBERS[encounter_level])
+                if len(rating_set.intersection(encounter_set)) != 0:
+                    motif_found = True
+                else:
+                    available_motives.pop(available_motives.index(motif))
+                    
         rooms = self.get_rooms()
         room_sizes = []
         number_of_rooms = len(rooms)
