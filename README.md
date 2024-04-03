@@ -2,7 +2,7 @@
 
 ## Obsah:
 Repozitář obsahuje aplikační část bakalářské práce Procedurální generování lokací do hry typu Dungeons \& Dragons.
-Více informací v textové části práce zde: [Bakalářská práce](https://stag.upol.cz/StagPortletsJSR168/PagesDispatcherServlet?pp_destElement=%23ssSouboryStudentuDivId_17466&pp_locale=cs&pp_reqType=render&pp_portlet=souboryStudentuPagesPortlet&pp_page=souboryStudentuDownloadPage&pp_nameSpace=G10308&soubidno=338086, "Textová část práce")
+Více informací v textové části práce zde: [Bakalářská práce](https://stag.upol.cz/StagPortletsJSR168/CleanUrl?urlid=prohlizeni-prace-detail&praceIdno=284252, "Textová část práce")
 
 ## Postup zprovoznění webové aplikace:
 (kroky 3 až 5 volitelné)
