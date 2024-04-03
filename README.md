@@ -2,7 +2,7 @@
 
 ## Obsah:
 Repozitář obsahuje aplikační část bakalářské práce Procedurální generování lokací do hry typu Dungeons \& Dragons.
-Více informací v textové části práce zde: [Bakalářská práce]([https://stag.upol.cz/portal/studium/prohlizeni.html?pc_phs=-2121444242&pc_mode=view&pc_windowid=10308&_csrf=dcf8255f-da10-4284-87aa-82eb30892b91&pc_phase=action&pc_pagenavigationalstate=AAAAAQAFMTAzMDgTAQAAAAEACHN0YXRlS2V5AAAAAQAULTkyMjMzNzIwMzY4NTQ3NjczMTgAAAAA&pc_type=portlet&pc_interactionstate=JBPNS_rO0ABXetAAlwcmFjZUlkbm8AAAABAAYyODQyNTIAEHByb2hsaXplbmlBY3Rpb24AAAABADpjei56Y3Uuc3RhZy5wb3J0bGV0czE2OC5wcm9obGl6ZW5pLnByYWNlLlByYWNlRGV0YWlsQWN0aW9uAAZkZXRhaWwAAAABAAlwcmFjZUluZm8ACHN0YXRlS2V5AAAAAQAULTkyMjMzNzIwMzY4NTQ3NjczMTgAB19fRU9GX18*&pc_windowstate=normal&pc_navigationalstate=JBPNS_rO0ABXctAAhzdGF0ZUtleQAAAAEAFC05MjIzMzcyMDM2ODU0NzY3MzE4AAdfX0VPRl9f#prohlizeniSearchResult](https://stag.upol.cz/StagPortletsJSR168/PagesDispatcherServlet?pp_destElement=%23ssSouboryStudentuDivId_17466&pp_locale=cs&pp_reqType=render&pp_portlet=souboryStudentuPagesPortlet&pp_page=souboryStudentuDownloadPage&pp_nameSpace=G10308&soubidno=338086) "Textová část práce")
+Více informací v textové části práce zde: [Bakalářská práce](https://stag.upol.cz/StagPortletsJSR168/PagesDispatcherServlet?pp_destElement=%23ssSouboryStudentuDivId_17466&pp_locale=cs&pp_reqType=render&pp_portlet=souboryStudentuPagesPortlet&pp_page=souboryStudentuDownloadPage&pp_nameSpace=G10308&soubidno=338086, "Textová část práce")
 
 ## Postup zprovoznění webové aplikace:
 (kroky 3 až 5 volitelné)
